@@ -10,6 +10,8 @@ An n8n automation that, after we set only the **target audience and a few number
 
 🎥 **Demo video:** [Watch on Google Drive](https://drive.google.com/file/d/1sVXYTZL5ddebEJV6xxOez4B-60E2_F7t/view?usp=sharing)
 
+📊 **Live Google Sheet (settings, leads, posts, comments, logs):** [Open the sheet (view only)](https://docs.google.com/spreadsheets/d/1agACOqJ6eqOTQMH5HFuBzvRaBG1Nn2pJQbxnNJlLjP4/edit?usp=sharing)
+
 | Approval email: post text + image, Approve / Reject | Approved post live on the company page |
 |---|---|
 | ![Approval email](screenshots/03-approval-email-post-and-image-approve-reject.png) | ![Live post](screenshots/01-live-post-published-on-company-page.png) |
