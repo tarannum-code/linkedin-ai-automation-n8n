@@ -1,0 +1,832 @@
+{
+  "name": "2 Posts - Publisher",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "name": "Every 15 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -208,
+        320
+      ],
+      "id": "1fc3f681-02bd-4664-b946-bb9e135c4879"
+    },
+    {
+      "parameters": {},
+      "name": "Manual run (test)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -208,
+        528
+      ],
+      "id": "73622648-49c7-493f-a6f1-8d88bf1833e8"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Settings",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "options": {}
+      },
+      "name": "Get Settings",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        32,
+        432
+      ],
+      "alwaysOutputData": true,
+      "id": "f3fbd2c3-6af1-4f1b-939f-57ea1acf3699"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2141293537,
+          "mode": "list",
+          "cachedResultName": "Posts",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=2141293537"
+        },
+        "options": {}
+      },
+      "name": "Get Posts",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        240,
+        432
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "id": "575b24c3-0eae-46ef-99c3-cae321fe833e"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 531499837,
+          "mode": "list",
+          "cachedResultName": "Logs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=531499837"
+        },
+        "options": {}
+      },
+      "name": "Get Logs",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        464,
+        432
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "id": "5595ffb4-503c-4d12-a34f-59e8b6c47cbd"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Publisher gate: pause, 429 wait, working hours, daily limit, 4 h gap -> picks ONE due approved post.\nconst ORG = 'urn:li:organization:YOUR_ORG_ID';\nconst s = $('Get Settings').first().json;\nconst posts = $('Get Posts').all().map(i => i.json).filter(p => p.id);\nconst logs = $('Get Logs').all().map(i => i.json);\nconst isTrue = v => String(v).trim().toUpperCase() === 'TRUE';\nlet manual = false;\ntry { manual = $('Manual run (test)').isExecuted; } catch (e) {}\n\nif (isTrue(s.paused)) return [];                                         // pause button\nconst todayUTC = DateTime.utc().toISODate();\nif (logs.some(l => l.action === 'rate_limited' && String(l.time).slice(0, 10) === todayUTC)) return []; // 429 -> wait until midnight UTC\n\nconst tz = s.timezone || 'Asia/Kolkata';\nconst now = DateTime.now().setZone(tz);\nconst [ws, we] = String(s.work_hours || '9-18').split(/[^0-9]+/).filter(Boolean).map(Number);\nif (!manual && (now.weekday > 5 || now.hour < ws || now.hour >= we)) return [];  // weekdays, working hours only\n\nconst published = posts.filter(p => p.status === 'published' && p.published_at)\n  .map(p => DateTime.fromISO(String(p.published_at)).setZone(tz));\nconst perDay = Number(s.posts_per_day) || 1;\nif (published.filter(d => d.toISODate() === now.toISODate()).length >= perDay) return [];   // daily limit\nconst gapH = Math.max(Number(s.post_gap_hours) || 4, 4);\nconst last = published.sort((a, b) => b - a)[0];\nif (last && now < last.plus({ hours: gapH })) return [];                 // min gap between posts\n\nconst due = posts.filter(p => p.status === 'approved' && p.scheduled_at &&\n                              DateTime.fromISO(String(p.scheduled_at)) <= now)\n                 .sort((a, b) => String(a.scheduled_at).localeCompare(String(b.scheduled_at)))[0];\nif (!due) return [];\n\n// LinkedIn \"little text\": escape reserved characters, keep hashtags clickable\nconst esc = t => String(t).replace(/[\\\\|{}@\\[\\]()<>#*_~]/g, m => '\\\\' + m);\nconst commentary = esc(due.text).replace(/\\\\#(\\w+)/g, '{hashtag|\\\\#|$1}');\n\nconst body = {\n  author: ORG,\n  commentary,\n  visibility: 'PUBLIC',\n  distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [], thirdPartyDistributionChannels: [] },\n  lifecycleState: 'PUBLISHED',\n  isReshareDisabledByAuthor: false,\n};\nif (due.image_urn) body.content = { media: { id: String(due.image_urn) } };\n\nreturn [{ json: { id: due.id, body } }];\n"
+      },
+      "name": "Gate & Pick",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        432
+      ],
+      "id": "ec785812-cebe-4c65-bee7-b0c2127951e6"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linkedin.com/rest/posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_LINKEDIN_TOKEN"
+            },
+            {
+              "name": "LinkedIn-Version",
+              "value": "202609"
+            },
+            {
+              "name": "X-Restli-Protocol-Version",
+              "value": "2.0.0"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "name": "Publish to LinkedIn",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        912,
+        432
+      ],
+      "id": "6b5e3da6-fc33-4a3f-a546-9f3dfa919c78"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// 201 -> published, 429 -> wait until midnight UTC (no retry), anything else -> pause everything + alert\nconst post = $('Gate & Pick').item.json;\nconst code = Number($json.statusCode);\nconst now = DateTime.now().toISO();\nif (code === 201) {\n  const urn = $json.headers?.['x-restli-id'] || $json.headers?.['x-linkedin-id'] || '';\n  return { json: { id: post.id, outcome: 'published', status: 'published', published_at: now, post_urn: urn,\n                   log_action: 'post_published', log_details: post.id + ' | ' + urn } };\n}\nif (code === 429) {\n  return { json: { id: post.id, outcome: 'rate_limited', log_action: 'rate_limited',\n                   log_details: post.id + ' | 429 from LinkedIn, no more calls until midnight UTC' } };\n}\nconst detail = JSON.stringify($json.body ?? $json).slice(0, 400);\nreturn { json: { id: post.id, outcome: 'error', log_action: 'paused_on_error',\n                 log_details: post.id + ' | HTTP ' + code + ' | ' + detail } };\n"
+      },
+      "name": "Check Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        432
+      ],
+      "id": "e0dfccc9-35ab-4978-af19-a58dddb635a7"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 531499837,
+          "mode": "list",
+          "cachedResultName": "Logs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=531499837"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "time": "={{ $now.toISO() }}",
+            "workflow": "2 Posts - Publisher",
+            "action": "={{ $json.log_action }}",
+            "details": "={{ $json.log_details }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "time",
+              "displayName": "time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "details",
+              "displayName": "details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "Write Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1360,
+        240
+      ],
+      "id": "579beffc-cd6f-4161-8012-a293bdc8e934"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "eaa70c08-0110-4cfe-888e-71235fbaf5c7",
+              "leftValue": "={{ $json.outcome === 'published' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Published?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        432
+      ],
+      "id": "25e7615b-4fcb-400c-87b5-130cd01e1c86"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2141293537,
+          "mode": "list",
+          "cachedResultName": "Posts",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=2141293537"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "status": "published",
+            " published_at": "={{ $json.published_at }}",
+            " post_urn": "=https://www.linkedin.com/embed/feed/update/{{ $json.post_urn }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "topic",
+              "displayName": "topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "text",
+              "displayName": "text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "scheduled_at",
+              "displayName": "scheduled_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": " published_at",
+              "displayName": " published_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": " post_urn",
+              "displayName": " post_urn",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "image_urn",
+              "displayName": "image_urn",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "Mark Published",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1584,
+        368
+      ],
+      "id": "c0df58dd-cd12-4167-8783-76b5ec96f85f"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "051d5e62-2484-4da7-9fdf-53645ce12088",
+              "leftValue": "={{ $json.outcome === 'error' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Error?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1584,
+        544
+      ],
+      "id": "19f30a8b-9098-4265-8850-82cd5218edb3"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Settings",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "key": "main",
+            "paused": "TRUE"
+          },
+          "matchingColumns": [
+            "key"
+          ],
+          "schema": [
+            {
+              "id": "key",
+              "displayName": "key",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "paused",
+              "displayName": "paused",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "target_audience",
+              "displayName": "target_audience",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "outreach_per_day",
+              "displayName": "outreach_per_day",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "outreach_gap",
+              "displayName": "outreach_gap",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "work_hours",
+              "displayName": "work_hours",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "timezone",
+              "displayName": "timezone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "posts_per_day",
+              "displayName": "posts_per_day",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "post_gap_hours",
+              "displayName": "post_gap_hours",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "check_interval_min",
+              "displayName": "check_interval_min",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "reply_delay",
+              "displayName": "reply_delay",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "followup_days",
+              "displayName": "followup_days",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "daily_report",
+              "displayName": "daily_report",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "Pause Everything",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1808,
+        528
+      ],
+      "id": "30315b37-20e3-4915-81ec-a16ebf4ac880"
+    },
+    {
+      "parameters": {
+        "sendTo": "YOUR_APPROVAL_EMAIL@gmail.com",
+        "subject": "LinkedIn automation PAUSED",
+        "message": "={{ '<p>The automation was <b>paused</b> because LinkedIn returned an error while publishing.</p><p>' + $('Check Result').item.json.log_details + '</p><p>Fix the cause, then set <b>paused = FALSE</b> in the Settings tab.</p>' }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "name": "Alert Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2032,
+        528
+      ],
+      "id": "b985b18a-cba4-4837-91f6-39cd5dd6a5dc",
+      "webhookId": "f7ecc8ee-512e-4f13-8892-a4c2ada6760f"
+    },
+    {
+      "parameters": {
+        "content": "## 2 · Posts – Publisher\nEvery 15 min (manual run skips the working-hours check): pause → 429 wait (Logs) → weekdays + working hours → daily limit → ≥4 h gap → ONE due **approved** post → POST /rest/posts as the company page (+ image_urn) →\n- 201: **published** + post_urn\n- 429: logged, no calls until midnight UTC (no retry loop)\n- any other error: **paused = TRUE** + alert email\nEvery outcome is logged.",
+        "height": 240,
+        "width": 600
+      },
+      "name": "Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "bbd26dba-7a30-4ee0-8335-b38277eed689"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 15 minutes": {
+      "main": [
+        [
+          {
+            "node": "Get Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual run (test)": {
+      "main": [
+        [
+          {
+            "node": "Get Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Settings": {
+      "main": [
+        [
+          {
+            "node": "Get Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Posts": {
+      "main": [
+        [
+          {
+            "node": "Get Logs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Logs": {
+      "main": [
+        [
+          {
+            "node": "Gate & Pick",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate & Pick": {
+      "main": [
+        [
+          {
+            "node": "Publish to LinkedIn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish to LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "Check Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Result": {
+      "main": [
+        [
+          {
+            "node": "Write Log",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Published?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Published?": {
+      "main": [
+        [
+          {
+            "node": "Mark Published",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error?": {
+      "main": [
+        [
+          {
+            "node": "Pause Everything",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pause Everything": {
+      "main": [
+        [
+          {
+            "node": "Alert Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": []
+}

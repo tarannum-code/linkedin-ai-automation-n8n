@@ -1,0 +1,996 @@
+{
+  "name": "1 Posts - Draft & Approval",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1-5"
+            }
+          ]
+        }
+      },
+      "name": "Every weekday 8 am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        6000,
+        3216
+      ],
+      "id": "5e407d18-daac-48e0-a378-cb073c5d27b5"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2141293537,
+          "mode": "list",
+          "cachedResultName": "Posts",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=2141293537"
+        },
+        "options": {}
+      },
+      "name": "Get Posts",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        6432,
+        3312
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "id": "123b830c-a59f-401a-9cd8-1f8d598f1e89"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Reads Settings + Posts, checks pause, plans today's post slots.\nconst s = $('Get Settings1').first().json;\nconst posts = $('Get Posts').all().map(i => i.json).filter(p => p.id);\nconst isTrue = v => String(v).trim().toUpperCase() === 'TRUE';\nif (isTrue(s.paused)) return [];                       // pause button\n\nconst tz = s.timezone || 'Asia/Kolkata';\nconst [ws, we] = String(s.work_hours || '9-18').split(/[^0-9]+/).filter(Boolean).map(Number);\nconst perDay = Number(s.posts_per_day) || 1;\nconst gapH = Math.max(Number(s.post_gap_hours) || 4, 4); // PDF: at least 4 h\n\n// Plan for today; if today's working hours are over (or weekend), plan for next weekday\nconst now = DateTime.now().setZone(tz);\nlet day = now;\nif (now.weekday > 5 || now.hour >= we - 1) {\n  day = now.plus({ days: 1 });\n  while (day.weekday > 5) day = day.plus({ days: 1 });\n}\nconst dayStr = day.toISODate();\nconst dayEnd = day.set({ hour: we, minute: 0, second: 0, millisecond: 0 });\n\nconst sameDay = posts.filter(p =>\n  ['pending', 'approved', 'published'].includes(String(p.status)) && p.scheduled_at &&\n  DateTime.fromISO(String(p.scheduled_at), { zone: tz }).toISODate() === dayStr);\nconst need = perDay - sameDay.length;\nif (need <= 0) return [];                              // daily post limit reached\n\nconst last = sameDay.map(p => DateTime.fromISO(String(p.scheduled_at), { zone: tz })).sort((a, b) => b - a)[0];\nlet slot = last ? last.plus({ hours: gapH })\n                : day.set({ hour: ws + 1, minute: 0, second: 0, millisecond: 0 });\n\nconst recent = posts.slice(-10).map(p => String(p.text || '').split('\\n')[0]).filter(Boolean);\n\nconst prompt = `You write LinkedIn posts for the company page of YOUR_COMPANY_NAME, which sells a learning management system (LMS).\nBrand voice: helpful, practical, plain English, no hype.\nTarget audience: ${s.target_audience}\n\nWrite ONE LinkedIn post that is useful to this audience on its own, even if they never buy anything.\n\nStructure:\n1. hook: max 200 characters, includes the primary keyword, makes them want to read on.\n2. content: 4-8 short paragraphs. A real problem this audience has, why it matters, 3-5 practical tips. Mention an LMS at most once, softly, as one option.\n3. cta: one question inviting comments. No links, no \"DM me\".\n4. hashtags: 3-5 (mix broad and niche), without spaces.\n\nSEO: pick 1 primary keyword and 2-3 secondary keywords and use them naturally.\nRules: no false claims, no invented statistics or numbers, no hype words, no links, 150-250 words total, max 2 emojis.\nPlain text only: no markdown, never use ** or * for bold or italics (LinkedIn shows them as symbols). For lists use \"1.\" or \"→\".\nDo NOT repeat these recent hooks/topics: ${recent.join(' | ') || 'none'}\n\nCheck your post against every rule before answering.\n5. image_prompt: a detailed prompt for ONE realistic, professional photo that fits this post (education / workplace setting, natural light, vertical 4:5, no text, no logos, no brand names).\n\nAnswer ONLY with JSON: {\"topic\":\"\",\"primary_keyword\":\"\",\"hook\":\"\",\"content\":\"\",\"cta\":\"\",\"hashtags\":[],\"image_prompt\":\"\"}`;\n\nconst out = [];\nfor (let i = 0; i < need && slot < dayEnd; i++) {\n  out.push({ json: { id: 'P' + Date.now() + i, scheduled_at: slot.toISO(), prompt } });\n  slot = slot.plus({ hours: gapH });\n}\nreturn out;\n"
+      },
+      "name": "Gate & Plan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6656,
+        3312
+      ],
+      "id": "e00db4a0-8371-4e56-8780-0ec7abffc5c8"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "options": {
+          "systemMessage": "You are a careful B2B LinkedIn copywriter. Always answer with valid JSON only, no markdown."
+        }
+      },
+      "name": "Write Post (AI Agent)",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        6880,
+        3312
+      ],
+      "id": "f78907d2-5361-4a43-ad18-1098dca7fa44"
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0.8
+        }
+      },
+      "name": "Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        6880,
+        3536
+      ],
+      "id": "6a2e3d9b-9e8b-43ac-b57f-68fa0a12d9ee"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        7312,
+        3312
+      ],
+      "id": "f46d806e-27bc-4250-94b6-9b84ba57b6d9"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c0e1d9f0-ec8a-487b-b481-e9264eb7bfef",
+              "leftValue": "={{ $json.upload }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Approved with image?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        8864,
+        3424
+      ],
+      "id": "5f4ad35e-f8e9-4230-b692-c43511374a78"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linkedin.com/rest/images?action=initializeUpload",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "LinkedIn-Version",
+              "value": "202609"
+            },
+            {
+              "name": "X-Restli-Protocol-Version",
+              "value": "2.0.0"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_LINKEDIN_TOKEN"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ initializeUploadRequest: { owner: 'urn:li:organization:YOUR_ORG_ID' } }) }}",
+        "options": {}
+      },
+      "name": "Init Image Upload",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9072,
+        3312
+      ],
+      "id": "6156ab41-8e64-4342-9a5e-8833e6ddb6b9",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const pick = (...names) => { for (const n of names) { try { return $(n).item; } catch (e) {} } throw new Error('Node not found: ' + names.join(' / ')); };\nreturn { json: $json, binary: pick('Decision', 'Decision1').binary };"
+      },
+      "name": "Attach Image",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9296,
+        3312
+      ],
+      "id": "6e179874-e7ee-4c56-824c-939c21a35582"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $json.value?.uploadUrl || 'https://api.linkedin.com/upload-url-missing' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer YOUR_LINKEDIN_TOKEN"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "name": "Upload Image to LinkedIn",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9520,
+        3312
+      ],
+      "id": "1eb2c305-6a53-49b3-be91-d64667c5fd1e",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const pick = (...names) => { for (const n of names) { try { return $(n).item; } catch (e) {} } throw new Error('Node not found: ' + names.join(' / ')); };\nconst d = pick('Decision', 'Decision1').json;\nconst urn = pick('Init Image Upload', 'Init Image Upload1').json?.value?.image || '';\nreturn { json: { ...d, image_urn: $json.error ? '' : urn } };"
+      },
+      "name": "Collect Image URN",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9744,
+        3312
+      ],
+      "id": "95a0862f-8fef-4051-bb31-1842cdb0fae3"
+    },
+    {
+      "parameters": {
+        "content": "## 1 · Posts – Draft & Approval\nWeekdays 8 am (or manual): pause check → plan slots (posts_per_day, ≥4 h gap, working hours) → AI Agent (Gemini) writes post + image prompt → Posts row **pending** → CometAPI image → preview email (text + image) → Gmail Approve/Reject → if approved, image uploaded to LinkedIn (image_urn) → **approved / rejected** → Logs.\n\nImage or LinkedIn upload failing never blocks the post: it continues text-only. Workflow 2 publishes at the slot.",
+        "height": 240,
+        "width": 620
+      },
+      "name": "Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        6192,
+        2912
+      ],
+      "id": "f0d51ec5-7642-44d1-8643-25e0b30d8c1d"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Settings",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "options": {}
+      },
+      "name": "Get Settings1",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        6224,
+        3312
+      ],
+      "alwaysOutputData": true,
+      "id": "8bee021c-03dd-4b8a-8ae3-344a5d845b0e"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turns the AI Agent's JSON into one Posts row (+ image prompt).\nconst plans = $('Gate & Plan').all();\nreturn $input.all().map((it, i) => {\n  const raw = String(it.json.output ?? it.json.text ?? '');\n  let d;\n  try { d = JSON.parse(raw.replace(/^\\s*```(json)?/i, '').replace(/```\\s*$/, '').trim()); }\n  catch (e) { throw new Error('AI did not return valid JSON: ' + raw.slice(0, 300)); }\n  const tags = (d.hashtags || []).map(h => '#' + String(h).replace(/^#/, '').replace(/\\s+/g, '')).join(' ');\n  const raw2 = [d.hook, d.content, d.cta, tags].filter(Boolean).join('\\n\\n').trim();\n  const text = raw2.replace(/\\*\\*(.+?)\\*\\*/g, '$1').replace(/(^|\\s)\\*(\\S[^*\\n]*?)\\*(?=[\\s.,:;!?]|$)/g, '$1$2');   // LinkedIn has no markdown\n  const p = plans[i].json;\n  return { json: { id: p.id, text, status: 'pending', scheduled_at: p.scheduled_at,\n                   published_at: '', post_urn: '', image_urn: '', image_prompt: d.image_prompt || '' } };\n});\n"
+      },
+      "name": "Build Post Row1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7136,
+        3312
+      ],
+      "id": "6aac5900-f9b3-4c98-ae21-a2490275e85b"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2141293537,
+          "mode": "list",
+          "cachedResultName": "Posts",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=2141293537"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "text": "={{ $json.text }}",
+            "status": "={{ $json.status }}",
+            "scheduled_at": "={{ $json.scheduled_at }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "topic",
+              "displayName": "topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "text",
+              "displayName": "text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "scheduled_at",
+              "displayName": "scheduled_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": " published_at",
+              "displayName": " published_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": " post_urn",
+              "displayName": " post_urn",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "image_urn",
+              "displayName": "image_urn",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "Save as Pending1",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        7536,
+        3424
+      ],
+      "id": "c0afe747-6f76-40ca-9987-808411951ee5"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2141293537,
+          "mode": "list",
+          "cachedResultName": "Posts",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=2141293537"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "status": "={{ $json.status }}",
+            "image_urn": "={{ $json.image_urn }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "topic",
+              "displayName": "topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "text",
+              "displayName": "text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "scheduled_at",
+              "displayName": "scheduled_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": " published_at",
+              "displayName": " published_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": " post_urn",
+              "displayName": " post_urn",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "image_urn",
+              "displayName": "image_urn",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "Update Post Status1",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        9952,
+        3440
+      ],
+      "id": "82e81a7e-0759-4695-a604-0eb7d55a67b1"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Logs",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "time": "={{ $now.toISO() }}",
+            "workflow": "1 Posts - Draft & Approval",
+            "action": "={{ 'post_' + $json.status }}",
+            "details": "={{ $json.id + ' | image: ' + ($json.image_urn || 'none') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "time",
+              "displayName": "time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "details",
+              "displayName": "details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "Write Log1",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        10176,
+        3440
+      ],
+      "id": "207f3663-7a41-4ac4-a3bf-6566fe3ba12e"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.cometapi.com/v1/images/generations",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_COMET_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'gpt-image-2.5-sunburst', prompt: $('Loop Over Items').item.json.image_prompt, size: '1024x1280', quality: 'high', n: 1, output_format: 'png', background: 'opaque' }) }}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "name": "Generate Image (CometAPI)1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        7728,
+        3728
+      ],
+      "id": "7ed9e484-e034-469f-bcb6-1d98e4336078",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $input.first().json || {};\nconst b64 =\n  j?.data?.[0]?.b64_json ||\n  j?.data?.[0]?.b64 ||\n  j?.b64_json ||\n  '';\n\nif (!b64) {\n  const url = j?.data?.[0]?.url || j?.url || '';\n  if (url) {\n    throw new Error('CometAPI returned an image URL instead of b64_json. Current workflow expects base64. URL: ' + url);\n  }\n  throw new Error('CometAPI did not return data[0].b64_json.');\n}\n\nreturn [{ json: { image_base64: b64, provider: 'CometAPI' } }];"
+      },
+      "id": "19c2111a-56b4-4eb4-b8bc-21886117ab6d",
+      "name": "Extract Edited Image",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8208,
+        3952
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "image_base64",
+        "options": {
+          "fileName": "generated-instagram-post.png",
+          "mimeType": "image/png"
+        }
+      },
+      "id": "6274b092-49c2-42bd-8568-67d1ffc7b1ce",
+      "name": "Convert Image to File",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        8416,
+        3952
+      ]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {}
+      },
+      "name": "Wait for Decision",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        8864,
+        3952
+      ],
+      "id": "2867630b-72ee-41f0-9559-9f1f5f62183d",
+      "webhookId": "e46592e7-e741-4143-86f0-9611d4105740"
+    },
+    {
+      "parameters": {
+        "sendTo": "YOUR_APPROVAL_EMAIL@gmail.com",
+        "subject": "={{ 'Approve LinkedIn post ' + $('Loop Over Items').item.json.id }}",
+        "message": "={{ '<p><b>New LinkedIn post</b> — scheduled for ' + $('Loop Over Items').item.json.scheduled_at + '</p><hr><p>' + String($('Loop Over Items').item.json.text).replace(/\\n/g, '<br>') + '</p><hr><p>Image attached.</p><p><a href=\"' + $execution.resumeUrl + ($execution.resumeUrl.includes('?') ? '&' : '?') + 'decision=approve\" style=\"display:inline-block;padding:10px 22px;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;background:#16a34a\">Approve</a> &nbsp; <a href=\"' + $execution.resumeUrl + ($execution.resumeUrl.includes('?') ? '&' : '?') + 'decision=reject\" style=\"display:inline-block;padding:10px 22px;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;background:#dc2626\">Reject</a></p>' }}",
+        "options": {
+          "appendAttribution": false,
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {}
+            ]
+          }
+        }
+      },
+      "name": "Send for Approval1",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        8640,
+        3952
+      ],
+      "id": "9b9d92ea-fb7a-4a86-8631-c61724b10b30",
+      "webhookId": "0d4575dc-f5e5-4d12-a1d2-35c50fe6aed5"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const pick = (...names) => { for (const n of names) { try { return $(n).item; } catch (e) {} } throw new Error('Node not found: ' + names.join(' / ')); };\nconst post = pick('Loop Over Items', 'Loop Over Items1').json;\nconst img = pick('Convert Image to File', 'Convert Image to File1', 'Image File', 'Image File1').binary;\nconst approved = String($json.query?.decision || '').toLowerCase() === 'approve';\nreturn { json: { id: post.id, status: approved ? 'approved' : 'rejected', scheduled_at: post.scheduled_at, image_urn: '', upload: approved && !!img?.data }, binary: img };"
+      },
+      "name": "Decision1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9088,
+        3952
+      ],
+      "id": "e3c5c699-3e1e-4b2a-83b1-2e02455d28d0"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every weekday 8 am": {
+      "main": [
+        [
+          {
+            "node": "Get Settings1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Posts": {
+      "main": [
+        [
+          {
+            "node": "Gate & Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate & Plan": {
+      "main": [
+        [
+          {
+            "node": "Write Post (AI Agent)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Write Post (AI Agent)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Post (AI Agent)": {
+      "main": [
+        [
+          {
+            "node": "Build Post Row1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Save as Pending1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approved with image?": {
+      "main": [
+        [
+          {
+            "node": "Init Image Upload",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Post Status1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Init Image Upload": {
+      "main": [
+        [
+          {
+            "node": "Attach Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach Image": {
+      "main": [
+        [
+          {
+            "node": "Upload Image to LinkedIn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Image to LinkedIn": {
+      "main": [
+        [
+          {
+            "node": "Collect Image URN",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Image URN": {
+      "main": [
+        [
+          {
+            "node": "Update Post Status1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Settings1": {
+      "main": [
+        [
+          {
+            "node": "Get Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Post Row1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save as Pending1": {
+      "main": [
+        [
+          {
+            "node": "Generate Image (CometAPI)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Post Status1": {
+      "main": [
+        [
+          {
+            "node": "Write Log1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Log1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Image (CometAPI)1": {
+      "main": [
+        [
+          {
+            "node": "Extract Edited Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Edited Image": {
+      "main": [
+        [
+          {
+            "node": "Convert Image to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert Image to File": {
+      "main": [
+        [
+          {
+            "node": "Send for Approval1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Decision": {
+      "main": [
+        [
+          {
+            "node": "Decision1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send for Approval1": {
+      "main": [
+        [
+          {
+            "node": "Wait for Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decision1": {
+      "main": [
+        [
+          {
+            "node": "Approved with image?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": []
+}

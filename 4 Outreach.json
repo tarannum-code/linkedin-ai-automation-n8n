@@ -1,0 +1,1293 @@
+{
+  "name": "4 Outreach",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 8 * * 1-5"
+            }
+          ]
+        }
+      },
+      "name": "Weekdays 8:30 am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -208,
+        368
+      ],
+      "id": "7a460fc7-650b-4322-bdf4-d08226f01d38"
+    },
+    {
+      "parameters": {},
+      "name": "Manual run (test)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -208,
+        880
+      ],
+      "id": "dd4c7dab-cc71-4a50-826f-1db868650344"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Settings",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "options": {}
+      },
+      "name": "L: Get Settings",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        32,
+        368
+      ],
+      "alwaysOutputData": true,
+      "id": "cffd066f-4393-456d-b14a-3da13e7512ff"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2128127281,
+          "mode": "list",
+          "cachedResultName": "Leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=2128127281"
+        },
+        "options": {}
+      },
+      "name": "L: Get Leads",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        240,
+        368
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "id": "78360e14-6ccb-40c0-9c1c-575ae7d4a693"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2116799616,
+          "mode": "list",
+          "cachedResultName": "DoNotContact",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=2116799616"
+        },
+        "options": {}
+      },
+      "name": "L: Get DoNotContact",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        464,
+        368
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "id": "17179e07-88d4-458f-880e-ab2bd2d7f8aa"
+    },
+    {
+      "parameters": {
+        "jsCode": "const pick = (...names) => { for (const n of names) { try { return $(n); } catch (e) {} } throw new Error('Node not found: ' + names.join(' / ')); };\n// Pause check -> prompt for search planning\nconst s = pick('L: Get Settings').first().json;\nif (String(s.paused).trim().toUpperCase() === 'TRUE') return [];\nreturn [{ json: { audience: s.target_audience, prompt:\n`We sell a learning management system (LMS). Target audience: ${s.target_audience}\n\nWrite 4 different web search queries that find REAL, publicly named people who match this audience (e.g. a school's \"principal\" or \"director\" page, a training company's \"about us / team\" page, news or interviews with L&D or HR heads). Do not search LinkedIn.\nAnswer ONLY with JSON: {\"queries\":[\"\",\"\",\"\",\"\"]}` } }];\n"
+      },
+      "name": "L: Plan Searches",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        368
+      ],
+      "id": "ee92889b-be08-4587-b909-bfc563360f81"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "options": {
+          "systemMessage": "You plan web searches. Answer with valid JSON only."
+        }
+      },
+      "name": "L: Search Planner (AI)",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        912,
+        368
+      ],
+      "id": "994fa9d4-f3cf-415a-874a-41a2b5b0386e"
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0.6
+        }
+      },
+      "name": "Gemini Model 1",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        912,
+        560
+      ],
+      "id": "a9938cfc-134e-427d-a488-39e9d6172032"
+    },
+    {
+      "parameters": {
+        "jsCode": "// AI output -> one item per search query\nconst raw = String($input.first().json.output ?? '');\nlet q = [];\ntry { q = JSON.parse(raw.replace(/^\\s*```(json)?/i, '').replace(/```\\s*$/, '').trim()).queries || []; } catch (e) {}\nif (!q.length) throw new Error('AI did not return search queries: ' + raw.slice(0, 200));\nreturn q.slice(0, 4).map(query => ({ json: { query } }));\n"
+      },
+      "name": "L: Queries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1168,
+        368
+      ],
+      "id": "248d17ee-0213-4bc3-9c99-d0e31dc3211f"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.tavily.com/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_TAVILY_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: $json.query, max_results: 8, search_depth: 'basic', include_answer: false, exclude_domains: ['linkedin.com'] }) }}",
+        "options": {}
+      },
+      "name": "L: Web Search (Tavily)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1344,
+        368
+      ],
+      "id": "bd8644dd-1e7a-40dc-8775-aeebfed3a14d",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const pick = (...names) => { for (const n of names) { try { return $(n); } catch (e) {} } throw new Error('Node not found: ' + names.join(' / ')); };\n// All search results -> one prompt for lead extraction + fit score\nconst s = pick('L: Get Settings').first().json;\nconst results = [];\nfor (const it of $input.all()) for (const r of (it.json.results || [])) results.push(`URL: ${r.url}\\nTITLE: ${r.title}\\nTEXT: ${String(r.content || '').slice(0, 600)}`);\nif (!results.length) return [];\nreturn [{ json: { prompt:\n`Target audience for our LMS: ${s.target_audience}\n\nFrom the PUBLIC web search results below, list real people who are explicitly named together with their role and organisation.\nRules:\n- Only people clearly stated in the results. Never invent names, roles, companies or links.\n- profile_url: a public profile/bio page of that person if one appears in the results (not linkedin.com), otherwise \"\".\n- source_url: the result URL where you found them.\n- fit_score 0-100: how well the person matches the target audience (role seniority, type and size of organisation, country).\n- fit_reason: max 15 words.\nMax 15 people. Answer ONLY with JSON: {\"leads\":[{\"name\":\"\",\"role\":\"\",\"company\":\"\",\"country\":\"\",\"profile_url\":\"\",\"source_url\":\"\",\"fit_score\":0,\"fit_reason\":\"\"}]}\n\nRESULTS:\n${results.join('\\n---\\n')}` } }];\n"
+      },
+      "name": "L: Combine Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        368
+      ],
+      "id": "0d41aa1d-73d5-47b3-a286-bfcc61ca08b3"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "options": {
+          "systemMessage": "You extract facts from search results without inventing anything. Answer with valid JSON only."
+        }
+      },
+      "name": "L: Extract & Score Leads (AI)",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        1792,
+        368
+      ],
+      "id": "b6a5e2fc-5a8f-4aef-9592-72270f8478fc"
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "name": "Gemini Model 2",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1792,
+        560
+      ],
+      "id": "cb2ad88c-ca59-46ab-9f77-26f329874948"
+    },
+    {
+      "parameters": {
+        "jsCode": "const pick = (...names) => { for (const n of names) { try { return $(n); } catch (e) {} } throw new Error('Node not found: ' + names.join(' / ')); };\n// Parse leads, drop duplicates + do-not-contact + low fit, cap 10 new per run\nconst raw = String($input.first().json.output ?? '');\nlet leads = [];\ntry { leads = JSON.parse(raw.replace(/^\\s*```(json)?/i, '').replace(/```\\s*$/, '').trim()).leads || []; } catch (e) {}\nconst norm = v => String(v || '').toLowerCase().trim();\nconst existing = pick('L: Get Leads').all().map(i => i.json);\nconst dnc = pick('L: Get DoNotContact').all().map(i => norm(i.json.entry)).filter(Boolean);\nconst seen = new Set(existing.map(l => norm(l.name) + '|' + norm(l.company)));\nconst blocked = l => dnc.some(e => e === norm(l.name) || e === norm(l.company) || (l.profile_url && e === norm(l.profile_url)));\nconst out = [];\nfor (const l of leads) {\n  const key = norm(l.name) + '|' + norm(l.company);\n  if (!l.name || !l.company || seen.has(key) || blocked(l) || Number(l.fit_score) < 60) continue;\n  if (String(l.profile_url || '').includes('linkedin.com')) l.profile_url = '';   // never store LinkedIn profile data\n  seen.add(key);\n  out.push({ json: { id: 'L' + Date.now() + out.length, name: l.name, role: l.role || '', company: l.company,\n                     profile_url: l.profile_url || l.source_url || '', fit_score: Math.round(Number(l.fit_score)),\n                     status: 'new', draft: '', next_action_at: '' } });\n  if (out.length >= 10) break;\n}\nreturn out;\n"
+      },
+      "name": "L: New Leads Only",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2064,
+        368
+      ],
+      "id": "d3d73092-fb7d-4fa6-97a2-235395dcaeff"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2128127281,
+          "mode": "list",
+          "cachedResultName": "Leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=2128127281"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "name": "={{ $json.name }}",
+            "role": "={{ $json.role }}",
+            "company": "={{ $json.company }}",
+            "profile_url": "={{ $json.profile_url }}",
+            "fit_score": "={{ $json.fit_score }}",
+            "status": "={{ $json.status }}",
+            "draft": "={{ $json.draft }}",
+            "next_action_at": "={{ $json.next_action_at }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "role",
+              "displayName": "role",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "profile_url",
+              "displayName": "profile_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fit_score",
+              "displayName": "fit_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "draft",
+              "displayName": "draft",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "next_action_at",
+              "displayName": "next_action_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "L: Save Leads",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2224,
+        368
+      ],
+      "id": "d5f41fd0-85cf-4e8e-b920-33065e633b8a"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 531499837,
+          "mode": "list",
+          "cachedResultName": "Logs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=531499837"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "time": "={{ $now.toISO() }}",
+            "workflow": "4 Outreach",
+            "action": "leads_found",
+            "details": "={{ $('L: New Leads Only').all().length + ' new leads' }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "time",
+              "displayName": "time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "details",
+              "displayName": "details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "L: Write Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2448,
+        368
+      ],
+      "executeOnce": true,
+      "id": "579af242-add6-4298-892e-30f1a9f8e21d"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/20 * * * 1-5"
+            }
+          ]
+        }
+      },
+      "name": "Every 20 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -208,
+        688
+      ],
+      "id": "10429ad4-4f92-4771-98b6-22b1b8dc7c34"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Settings",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "options": {}
+      },
+      "name": "Q: Get Settings",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        32,
+        784
+      ],
+      "alwaysOutputData": true,
+      "id": "d22cfad0-1deb-4fff-ad31-bb3c990379ae"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2128127281,
+          "mode": "list",
+          "cachedResultName": "Leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=2128127281"
+        },
+        "options": {}
+      },
+      "name": "Q: Get Leads",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        240,
+        784
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "id": "db36b5db-8e14-41c9-9208-c1adde715298"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2116799616,
+          "mode": "list",
+          "cachedResultName": "DoNotContact",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=2116799616"
+        },
+        "options": {}
+      },
+      "name": "Q: Get DoNotContact",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        464,
+        784
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "id": "d28d2010-6747-4b15-b842-901d0dc7883d"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 531499837,
+          "mode": "list",
+          "cachedResultName": "Logs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=531499837"
+        },
+        "options": {}
+      },
+      "name": "Q: Get Logs",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        688,
+        784
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "id": "48391c42-4649-4649-bfb4-9265cf0abb17"
+    },
+    {
+      "parameters": {
+        "jsCode": "const pick = (...names) => { for (const n of names) { try { return $(n); } catch (e) {} } throw new Error('Node not found: ' + names.join(' / ')); };\n// Picks ONE outreach action: follow-up due > first message (connected) > connection request (best fit)\nconst s = pick('Q: Get Settings').first().json;\nconst leads = pick('Q: Get Leads').all().map(i => i.json).filter(l => l.id);\nconst logs = pick('Q: Get Logs').all().map(i => i.json);\nconst norm = v => String(v || '').toLowerCase().trim();\nconst dnc = pick('Q: Get DoNotContact').all().map(i => norm(i.json.entry)).filter(Boolean);\nlet manual = false;\ntry { manual = $('Manual run (test)').isExecuted; } catch (e) {}\n\nif (String(s.paused).trim().toUpperCase() === 'TRUE') return [];\nconst tz = s.timezone || 'Asia/Kolkata';\nconst now = DateTime.now().setZone(tz);\nconst [ws, we] = String(s.work_hours || '9-18').split(/[^0-9]+/).filter(Boolean).map(Number);\nif (!manual && (now.weekday > 5 || now.hour < ws || now.hour >= we)) return [];      // weekdays, working hours\nif (leads.some(l => String(l.status).startsWith('awaiting'))) return [];               // one at a time, no bursts\n\nconst sentToday = logs.filter(l => l.action === 'outreach_sent' &&\n  DateTime.fromISO(String(l.time)).setZone(tz).toISODate() === now.toISODate())\n  .sort((a, b) => String(b.time).localeCompare(String(a.time)));\nif (sentToday.length >= (Number(s.outreach_per_day) || 3)) return [];                   // daily limit\nconst m = String(sentToday[0]?.details || '').match(/next_after=(\\S+)/);\nif (!manual && m && now < DateTime.fromISO(m[1])) return [];                            // random 20-40 min gap\n\nconst blocked = l => dnc.some(e => e === norm(l.name) || e === norm(l.company) || (l.profile_url && e === norm(l.profile_url)));\nconst due = d => d && DateTime.fromISO(String(d)) <= now;\nconst followups = leads.filter(l => l.status === 'messaged' && due(l.next_action_at));\nconst connected = leads.filter(l => l.status === 'connected');\nconst fresh = leads.filter(l => l.status === 'new').sort((a, b) => Number(b.fit_score) - Number(a.fit_score));\nconst pickOne = (arr, stage) => { const l = arr.find(x => !blocked(x)); return l ? { ...l, stage } : null; };\nconst lead = pickOne(followups, 'followup') || pickOne(connected, 'message') || pickOne(fresh, 'request');\nif (!lead) return [];\n\nconst who = `${lead.name}, ${lead.role} at ${lead.company}`;\nconst base = `We are YOUR_COMPANY_NAME. We sell a learning management system (LMS) that helps schools, colleges, training companies and HR/L&D teams run courses, track progress and certify learners.\nWrite to: ${who}.\nRules: honest, plain English, no false claims, no invented facts or numbers, no pressure, no links, do not pretend to know them, write as a real person from our team.`;\nconst task = {\n  request: `Write a LinkedIn connection request note. MAX 200 characters. Say who we are and why we want to connect (relevant to their role). No sales pitch.`,\n  message: `They accepted our connection request. Write the FIRST message (max 600 characters): who we are, why we are writing to them specifically, how our LMS could help someone in their role, one soft question. End with a clear way to say no, e.g. \"If this isn't relevant, just tell me and I won't message again.\"`,\n  followup: `We sent a first message ${s.followup_days || 5} days ago and got no answer. Write ONE short, polite follow-up (max 300 characters). No guilt, no pressure. Make it easy to say no. This is the last message we will send.`,\n}[lead.stage];\nreturn [{ json: { ...lead, prompt: base + '\\n\\n' + task + '\\n\\nAnswer with the message text only.' } }];\n"
+      },
+      "name": "Q: Pick Next Lead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        784
+      ],
+      "id": "eb62ffb8-370a-4c9e-b007-4068da847948"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "options": {
+          "systemMessage": "You write short, honest LinkedIn outreach. Output only the message text."
+        }
+      },
+      "name": "Q: Write Message (AI)",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        1120,
+        784
+      ],
+      "id": "9be67325-4577-46ec-a822-3860ccce3612"
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0.6
+        }
+      },
+      "name": "Gemini Model 3",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        992
+      ],
+      "id": "3fbcfb5a-e969-409a-9dd1-5d9ea07ecefd"
+    },
+    {
+      "parameters": {
+        "jsCode": "const pick = (...names) => { for (const n of names) { try { return $(n); } catch (e) {} } throw new Error('Node not found: ' + names.join(' / ')); };\n// Clean the AI draft, enforce the length limit\nconst lead = pick('Q: Pick Next Lead').first().json;\nlet text = String($input.first().json.output ?? '').replace(/^[\"'\\s]+|[\"'\\s]+$/g, '').trim();\nconst max = { request: 200, message: 600, followup: 300 }[lead.stage];\nif (text.length > max) text = text.slice(0, max - 1).replace(/\\s+\\S*$/, '') + '…';\nreturn [{ json: { id: lead.id, name: lead.name, role: lead.role, company: lead.company, profile_url: lead.profile_url,\n                  stage: lead.stage, prev_status: lead.status, status: 'awaiting_' + lead.stage, draft: text } }];\n"
+      },
+      "name": "Q: Clean Draft",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1392,
+        784
+      ],
+      "id": "77dc9371-9293-449d-aa6e-363ed934a054"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2128127281,
+          "mode": "list",
+          "cachedResultName": "Leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=2128127281"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "status": "={{ $json.status }}",
+            "draft": "={{ $json.draft }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "draft",
+              "displayName": "draft",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "Q: Mark Awaiting",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1568,
+        784
+      ],
+      "id": "c05549ff-6238-46ec-a7f7-10da58bde59d"
+    },
+    {
+      "parameters": {
+        "sendTo": "YOUR_APPROVAL_EMAIL@gmail.com",
+        "subject": "={{ 'LinkedIn outreach: ' + $('Q: Clean Draft').first().json.name + ' (' + $('Q: Clean Draft').first().json.stage + ')' }}",
+        "message": "={{ (() => { const l = $('Q: Clean Draft').first().json; const what = { request: 'Send this CONNECTION REQUEST (with note)', message: 'Send this FIRST MESSAGE (they are now a 1st-degree connection)', followup: 'Send this ONE FOLLOW-UP (last message)' }[l.stage]; const link = l.profile_url ? '<a href=\"' + l.profile_url + '\">' + l.profile_url + '</a><br>' : ''; const search = 'https://www.linkedin.com/search/results/people/?keywords=' + encodeURIComponent(l.name + ' ' + l.company); return '<p><b>' + what + '</b></p><p><b>To:</b> ' + l.name + ' — ' + l.role + ', ' + l.company + '<br>' + link + '<a href=\"' + search + '\">Find them on LinkedIn</a></p><p style=\"padding:12px;background:#f3f4f6;border-radius:6px\">' + l.draft.replace(/\\n/g, '<br>') + '</p><p>Copy it, send it yourself on LinkedIn, then click <b>I sent it</b>. Nothing is sent automatically.</p>' + '<p><a href=\"' + $execution.resumeUrl + ($execution.resumeUrl.includes(\"?\") ? \"&\" : \"?\") + 'decision=sent\" style=\"display:inline-block;padding:10px 22px;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;background:#16a34a\">I sent it</a> &nbsp; <a href=\"' + $execution.resumeUrl + ($execution.resumeUrl.includes(\"?\") ? \"&\" : \"?\") + 'decision=skip\" style=\"display:inline-block;padding:10px 22px;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;background:#dc2626\">Skip this person</a></p>'; })() }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "name": "Q: Email to Person",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1792,
+        784
+      ],
+      "id": "7058fc0f-7b1c-47ab-b323-034a8801ea5a",
+      "webhookId": "54a0208f-d93b-437b-8a41-3d331700312c"
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {}
+      },
+      "name": "Q: Wait for Person",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2000,
+        784
+      ],
+      "webhookId": "f9e5c56f-d9bc-4059-a1ce-e5acdcfbc151",
+      "id": "75b608ca-2f15-4570-a8fc-72a33776d585"
+    },
+    {
+      "parameters": {
+        "jsCode": "const pick = (...names) => { for (const n of names) { try { return $(n); } catch (e) {} } throw new Error('Node not found: ' + names.join(' / ')); };\n// Person clicked \"I sent it\" / \"Skip\" -> new lead status + next follow-up date + next allowed outreach time\nconst l = pick('Q: Clean Draft').first().json;\nconst s = pick('Q: Get Settings').first().json;\nconst sent = String($json.query?.decision || '') === 'sent';\nconst now = DateTime.now();\nconst [gmin, gmax] = String(s.outreach_gap || '20-40').split(/[^0-9]+/).filter(Boolean).map(Number);\nconst gap = Math.floor(gmin + Math.random() * (gmax - gmin + 1));\nlet status = 'skipped', next = '';\nif (sent) {\n  status = { request: 'request_sent', message: 'messaged', followup: 'followed_up' }[l.stage];\n  if (l.stage === 'message') next = now.plus({ days: Number(s.followup_days) || 5 }).toISO();\n}\nreturn [{ json: { id: l.id, status, next_action_at: next,\n  log_action: sent ? 'outreach_sent' : 'outreach_skipped',\n  log_details: `${l.stage} | ${l.name} (${l.company})` + (sent ? ` | next_after=${now.plus({ minutes: gap }).toISO()}` : '') } }];\n"
+      },
+      "name": "Q: Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2224,
+        784
+      ],
+      "id": "cc237782-73fb-4cbc-9516-0d0e99112c63"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2128127281,
+          "mode": "list",
+          "cachedResultName": "Leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=2128127281"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "status": "={{ $json.status }}",
+            "next_action_at": "={{ $json.next_action_at }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "next_action_at",
+              "displayName": "next_action_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "Q: Update Lead",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2448,
+        784
+      ],
+      "id": "b328f294-9144-44c2-b12a-915ef1967820"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 531499837,
+          "mode": "list",
+          "cachedResultName": "Logs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=531499837"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "time": "={{ $now.toISO() }}",
+            "workflow": "4 Outreach",
+            "action": "={{ $('Q: Decision').first().json.log_action }}",
+            "details": "={{ $('Q: Decision').first().json.log_details }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "time",
+              "displayName": "time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "details",
+              "displayName": "details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Q: Write Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2672,
+        784
+      ],
+      "id": "f916f777-4d08-4441-87f1-f8c72aa76923"
+    },
+    {
+      "parameters": {
+        "content": "## 4 · Outreach\n**A. Find leads** (weekdays 8:30): AI plans web searches from target_audience → Tavily (linkedin.com excluded, no profile copying) → AI extracts only explicitly named people + **fit score** → drop duplicates, do-not-contact, fit < 60 → Leads (status new).\n\n**B. Daily queue** (every 20 min, weekdays, working hours): ONE action at a time → follow-up due (once, after followup_days) > first message (only after they accepted = 1st-degree) > connection request (best fit). Stops at **outreach_per_day**, random **20–40 min gap**, skips do-not-contact. AI drafts → email to a person → **the person sends it on LinkedIn** → clicks *I sent it* / *Skip* → status + log.",
+        "height": 300,
+        "width": 700
+      },
+      "name": "Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "8642e57c-ff0e-422e-8dbb-ae09a3901d76"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Weekdays 8:30 am": {
+      "main": [
+        [
+          {
+            "node": "L: Get Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual run (test)": {
+      "main": [
+        [
+          {
+            "node": "Q: Get Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "L: Get Settings": {
+      "main": [
+        [
+          {
+            "node": "L: Get Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "L: Get Leads": {
+      "main": [
+        [
+          {
+            "node": "L: Get DoNotContact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "L: Get DoNotContact": {
+      "main": [
+        [
+          {
+            "node": "L: Plan Searches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "L: Plan Searches": {
+      "main": [
+        [
+          {
+            "node": "L: Search Planner (AI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Model 1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "L: Search Planner (AI)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "L: Search Planner (AI)": {
+      "main": [
+        [
+          {
+            "node": "L: Queries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "L: Queries": {
+      "main": [
+        [
+          {
+            "node": "L: Web Search (Tavily)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "L: Web Search (Tavily)": {
+      "main": [
+        [
+          {
+            "node": "L: Combine Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "L: Combine Results": {
+      "main": [
+        [
+          {
+            "node": "L: Extract & Score Leads (AI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Model 2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "L: Extract & Score Leads (AI)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "L: Extract & Score Leads (AI)": {
+      "main": [
+        [
+          {
+            "node": "L: New Leads Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "L: New Leads Only": {
+      "main": [
+        [
+          {
+            "node": "L: Save Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "L: Save Leads": {
+      "main": [
+        [
+          {
+            "node": "L: Write Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every 20 min": {
+      "main": [
+        [
+          {
+            "node": "Q: Get Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Q: Get Settings": {
+      "main": [
+        [
+          {
+            "node": "Q: Get Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Q: Get Leads": {
+      "main": [
+        [
+          {
+            "node": "Q: Get DoNotContact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Q: Get DoNotContact": {
+      "main": [
+        [
+          {
+            "node": "Q: Get Logs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Q: Get Logs": {
+      "main": [
+        [
+          {
+            "node": "Q: Pick Next Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Q: Pick Next Lead": {
+      "main": [
+        [
+          {
+            "node": "Q: Write Message (AI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Model 3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Q: Write Message (AI)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Q: Write Message (AI)": {
+      "main": [
+        [
+          {
+            "node": "Q: Clean Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Q: Clean Draft": {
+      "main": [
+        [
+          {
+            "node": "Q: Mark Awaiting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Q: Mark Awaiting": {
+      "main": [
+        [
+          {
+            "node": "Q: Email to Person",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Q: Email to Person": {
+      "main": [
+        [
+          {
+            "node": "Q: Wait for Person",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Q: Wait for Person": {
+      "main": [
+        [
+          {
+            "node": "Q: Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Q: Decision": {
+      "main": [
+        [
+          {
+            "node": "Q: Update Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Q: Update Lead": {
+      "main": [
+        [
+          {
+            "node": "Q: Write Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": []
+}

@@ -1,0 +1,2174 @@
+{
+  "name": "5 Messages & Control",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "LinkedIn message reply",
+        "formDescription": "Paste the whole LinkedIn chat. AI reads all of it and drafts a reply for you to approve and send yourself.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Lead (name or profile link)",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Full conversation (paste everything, oldest first)",
+              "fieldType": "textarea",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "M: Message Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        -128,
+        416
+      ],
+      "webhookId": "1a077014-c328-4dfc-a0bb-e3adeee7ac42",
+      "id": "fbc07138-1225-478f-b42b-a8db8d6afe20"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Settings",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "options": {}
+      },
+      "name": "M: Get Settings",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        96,
+        416
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "id": "602278f2-966f-4553-a447-f118e0e8992a"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2128127281,
+          "mode": "list",
+          "cachedResultName": "Leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=2128127281"
+        },
+        "options": {}
+      },
+      "name": "M: Get Leads",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        320,
+        416
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "id": "e77c79a5-b8ca-465c-b6f5-9c46edb30df0"
+    },
+    {
+      "parameters": {
+        "jsCode": "const pick = (...names) => { for (const n of names) { try { return $(n); } catch (e) {} } throw new Error('Node not found: ' + names.join(' / ')); };\nconst norm = v => String(v || '').toLowerCase().replace(/\\b(mr|mrs|ms|miss|dr|prof)\\.?\\s+/g, '').replace(/\\s+/g, ' ').trim();\nconst findLead = (q, leads) => { q = norm(q); if (!q) return null;\n  return leads.find(l => norm(l.id) === q) ||\n         leads.find(l => l.profile_url && (norm(l.profile_url) === q || q.includes(norm(l.profile_url)))) ||\n         leads.find(l => norm(l.name) === q) ||\n         leads.find(l => l.name && (q.includes(norm(l.name)) || norm(l.name).includes(q))) || null; };\n// Works whatever the form labels are: the conversation is the field named chat/conversation/message (or the longest text);\n// the lead is found from any other field (lead id, name or profile link).\nconst s = pick('M: Get Settings').first().json;\nif (String(s.paused).trim().toUpperCase() === 'TRUE') return [];\nconst fields = Object.entries($input.first().json).filter(([k, v]) => typeof v === 'string' && v.trim() && !/submittedAt|formMode/i.test(k));\nconst chatField = fields.find(([k]) => /conversation|chat|message/i.test(k)) || [...fields].sort((a, b) => b[1].length - a[1].length)[0] || ['', ''];\nconst chat = String(chatField[1]).trim();\nconst leads = pick('M: Get Leads').all().map(i => i.json).filter(l => l.id);\nlet lead = null, typed = '';\nfor (const [k, v] of fields) { if (k === chatField[0]) continue; typed = typed || v; lead = lead || findLead(v, leads); }\nlead = lead || {};\nreturn [{ json: {\n  lead_id: lead.id || '', name: lead.name || typed, company: lead.company || '',\n  profile_url: lead.profile_url || '', chat,\n  prompt: `We are YOUR_COMPANY_NAME and we sell a learning management system (LMS). Below is our FULL LinkedIn conversation with ${lead.name || 'this person'}${lead.company ? ' (' + lead.company + ')' : ''}, oldest first.\n\n${chat}\n\nRead the WHOLE conversation and look at their latest message.\nClassify it as exactly one of:\n- stop: they said no, not interested, or asked us to stop / not contact them again\n- needs_human: price disputes or negotiation, discounts, contracts, complaints, refunds, problems, angry tone, or they ask for a person / a call / a demo with someone\n- normal: anything else\nIf normal, write OUR next reply: it must fit this exact conversation (refer to what they actually said), honest, no invented facts, prices or promises, max 500 characters, no pressure, and keep a clear way to say no.\nAnswer ONLY with JSON: {\"category\":\"\",\"reason\":\"max 12 words\",\"reply\":\"\"}` } }];"
+      },
+      "name": "M: Prepare",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        544,
+        416
+      ],
+      "id": "594281cd-6a67-4b48-acee-d3519c201bc0"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "options": {
+          "systemMessage": "You read whole conversations carefully and never invent facts. Answer with valid JSON only."
+        }
+      },
+      "name": "M: Read Chat & Draft (AI)",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        752,
+        416
+      ],
+      "id": "5eb71323-5bde-4cb3-9f21-cc953a508cd6"
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0.4
+        }
+      },
+      "name": "Gemini Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        752,
+        608
+      ],
+      "id": "e0b8f2c1-d103-4285-9228-d499a21b2f4e"
+    },
+    {
+      "parameters": {
+        "jsCode": "const pick = (...names) => { for (const n of names) { try { return $(n); } catch (e) {} } throw new Error('Node not found: ' + names.join(' / ')); };\n// AI result + keyword safety nets on THEIR latest message (stop > needs a person > normal)\nconst p = pick('M: Prepare').first().json;\nconst raw = String($input.first().json.output ?? '');\nlet d = {};\ntry { d = JSON.parse(raw.replace(/^\\s*```(json)?/i, '').replace(/```\\s*$/, '').trim()); } catch (e) { d = { category: 'needs_human', reason: 'AI output unreadable', reply: '' }; }\nlet cat = ['stop', 'needs_human', 'normal'].includes(d.category) ? d.category : 'needs_human';\nlet reason = d.reason || '';\n// their latest message = last non-empty line that is not ours (\"Us:\" / \"Me:\" / \"We:\")\nconst lines = p.chat.split('\\n').map(l => l.trim()).filter(Boolean);\nconst theirs = [...lines].reverse().find(l => !/^(us|me|we|our team)\\s*:/i.test(l)) || lines[lines.length - 1] || '';\nconst last = theirs.toLowerCase();\nif (/\\b(stop|unsubscribe|not interested|no thanks|don'?t contact|do not contact|remove me|leave me alone)\\b/.test(last)) {\n  if (d.category !== 'stop') reason = 'said no / asked to stop'; cat = 'stop';\n} else if (/\\b(price|pricing|cost|costs|expensive|cheaper|discount|quote|quoted|invoice|refund|contract|complain|complaint|disappointed|unhappy|angry|terrible|crash\\w*|broken|not working|bug|issue|problem|talk to (someone|a person|a human|your team)|speak (to|with) (someone|a person|a human)|real person|human|manager|call me|on a call|phone)\\b/.test(last)) {\n  if (cat !== 'stop') { cat = 'needs_human'; reason = reason && d.category === 'needs_human' ? reason : 'price, complaint or asks for a person'; }\n}\nreturn [{ json: { ...p, category: cat, reason, reply: cat === 'normal' ? String(d.reply || '') : '' } }];"
+      },
+      "name": "M: Parse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1008,
+        416
+      ],
+      "id": "9e1e7f48-566c-426f-8268-6e9e0a26edd0"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "9a44ca2d-e111-43ee-91f6-e2c0c087a4e4",
+              "leftValue": "={{ $json.category === 'stop' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "M: Said stop?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1216,
+        240
+      ],
+      "id": "240ea166-02a2-42e0-a869-51146d55098f"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2116799616,
+          "mode": "list",
+          "cachedResultName": "DoNotContact",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=2116799616"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "entry": "={{ $json.profile_url || $json.name }}",
+            "reason": "said no / asked to stop (message)"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "entry",
+              "displayName": "entry",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "M: Add to DoNotContact",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1488,
+        224
+      ],
+      "id": "e6a1adce-a0d9-4e84-b448-e47fd8fea479"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2128127281,
+          "mode": "list",
+          "cachedResultName": "Leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=2128127281"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('M: Parse').first().json.lead_id }}",
+            "status": "do_not_contact"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "role",
+              "displayName": "role",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "profile_url",
+              "displayName": "profile_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fit_score",
+              "displayName": "fit_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "draft",
+              "displayName": "draft",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "next_action_at",
+              "displayName": "next_action_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "M: Lead → do_not_contact",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1696,
+        224
+      ],
+      "id": "b6938e57-2672-47eb-aa01-bfef76f23143",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 531499837,
+          "mode": "list",
+          "cachedResultName": "Logs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=531499837"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "time": "={{ $now.toISO() }}",
+            "workflow": "5 Messages & Control",
+            "action": "message_stop",
+            "details": "={{ $('M: Parse').first().json.name }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "time",
+              "displayName": "time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "details",
+              "displayName": "details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "M: Log Stop",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1920,
+        224
+      ],
+      "id": "597c82b9-37fb-4e41-bc77-da8edb45e960"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "09339fc3-a4e6-429f-a576-58ee4930740b",
+              "leftValue": "={{ $json.category === 'needs_human' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "M: Needs a person?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1216,
+        416
+      ],
+      "id": "4c4b0637-e044-411a-8ff1-7188391defa5"
+    },
+    {
+      "parameters": {
+        "sendTo": "YOUR_APPROVAL_EMAIL@gmail.com",
+        "subject": "={{ 'LinkedIn message needs a person: ' + $json.name }}",
+        "message": "={{ '<p>This message was passed to a person: <b>' + $json.reason + '</b></p><p>' + $json.chat.replace(/\\n/g, '<br>') + '</p><p>Please reply yourself on LinkedIn.</p>' }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "name": "M: Escalation Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1440,
+        400
+      ],
+      "id": "9f80afaf-9ebf-4ff3-aef2-5c1fbd8761b5",
+      "webhookId": "6a50adf3-0826-403f-8bb8-efbe31ae516a"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 531499837,
+          "mode": "list",
+          "cachedResultName": "Logs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=531499837"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "time": "={{ $now.toISO() }}",
+            "workflow": "5 Messages & Control",
+            "action": "message_escalated",
+            "details": "={{ $('M: Parse').first().json.name + ' | ' + $('M: Parse').first().json.reason }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "time",
+              "displayName": "time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "details",
+              "displayName": "details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "M: Log Escalation",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1648,
+        400
+      ],
+      "id": "4498c4ae-129a-4a61-a2ba-6231e0e0b2e9"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "e73d09e7-67f6-46b2-952f-7500ed5808f3",
+              "leftValue": "={{ $json.category === 'normal' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "M: Normal reply?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1216,
+        592
+      ],
+      "id": "689cb702-9757-4625-a32f-57c61cc1fdcc"
+    },
+    {
+      "parameters": {
+        "sendTo": "YOUR_APPROVAL_EMAIL@gmail.com",
+        "subject": "={{ 'Approve LinkedIn reply to ' + $json.name }}",
+        "message": "={{ (() => { const p = $('M: Parse').first().json; return '<p><b>Reply to ' + p.name + (p.company ? ' (' + p.company + ')' : '') + ' on LinkedIn?</b></p><p><b>Proposed reply:</b></p><p style=\"padding:12px;background:#f3f4f6;border-radius:6px\">' + p.reply.replace(/\\n/g, '<br>') + '</p><details><summary>Conversation</summary><p>' + p.chat.replace(/\\n/g, '<br>') + '</p></details><p>Copy it, send it yourself in the LinkedIn chat (1st-degree connection), then click <b>I sent it</b>.</p>' + '<p><a href=\"' + $execution.resumeUrl + ($execution.resumeUrl.includes(\"?\") ? \"&\" : \"?\") + 'decision=sent\" style=\"display:inline-block;padding:10px 22px;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;background:#16a34a\">I sent it</a> &nbsp; <a href=\"' + $execution.resumeUrl + ($execution.resumeUrl.includes(\"?\") ? \"&\" : \"?\") + 'decision=skip\" style=\"display:inline-block;padding:10px 22px;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;background:#dc2626\">Do not send</a></p>'; })() }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "name": "M: Approval Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1456,
+        576
+      ],
+      "id": "8eb87394-c2e4-4df0-a004-de115754fb9c",
+      "webhookId": "a5e4bb14-927f-448c-b95f-04fcf65a24e7"
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {}
+      },
+      "name": "M: Wait for Person",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1648,
+        576
+      ],
+      "webhookId": "ef14386f-7e8f-4da3-ba1c-157415a2990a",
+      "id": "4dbeeb9a-470b-4384-93a2-b08a3d2e15ca"
+    },
+    {
+      "parameters": {
+        "jsCode": "const pick = (...names) => { for (const n of names) { try { return $(n); } catch (e) {} } throw new Error('Node not found: ' + names.join(' / ')); };\n// Final status for the lead + log line\nconst p = pick('M: Parse').first().json;\nconst sent = String($json.query?.decision || '') === 'sent';\nreturn [{ json: { id: p.lead_id, status: 'replied', next_action_at: '',\n  log_action: sent ? 'message_reply_sent' : 'message_reply_skipped', log_details: p.name } }];\n"
+      },
+      "name": "M: Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1872,
+        576
+      ],
+      "id": "3246d07d-d3bd-40b0-9ac4-0a401eb4d36f"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2128127281,
+          "mode": "list",
+          "cachedResultName": "Leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=2128127281"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "status": "={{ $json.status }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "role",
+              "displayName": "role",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "profile_url",
+              "displayName": "profile_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fit_score",
+              "displayName": "fit_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "draft",
+              "displayName": "draft",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "next_action_at",
+              "displayName": "next_action_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "M: Lead → replied",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2096,
+        576
+      ],
+      "id": "b8a5e2f3-26a8-473d-b144-e7107b474a94",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Logs",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "time": "={{ $now.toISO() }}",
+            "workflow": "5 Messages & Control",
+            "action": "={{ $('M: Result').first().json.log_action }}",
+            "details": "={{ $('M: Result').first().json.log_details }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "time",
+              "displayName": "time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "details",
+              "displayName": "details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "M: Log Reply",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2320,
+        576
+      ],
+      "id": "1ad2d1e5-a13c-4e5c-bd01-abdee1a335a7"
+    },
+    {
+      "parameters": {
+        "formTitle": "LinkedIn automation control",
+        "formDescription": "Update a lead after you act on LinkedIn, stop or delete a person, or pause / resume everything.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Action",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Connection accepted"
+                  },
+                  {
+                    "option": "They replied (stop follow-ups)"
+                  },
+                  {
+                    "option": "Said no / asked to stop"
+                  },
+                  {
+                    "option": "Delete their data"
+                  },
+                  {
+                    "option": "PAUSE everything (warning or restriction seen)"
+                  },
+                  {
+                    "option": "Resume"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Lead (name or profile link)"
+            },
+            {
+              "fieldLabel": "Notes",
+              "fieldType": "textarea"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "C: Control Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        -128,
+        1008
+      ],
+      "webhookId": "303f8eba-2ee9-4073-9bb1-be00c7a0caef",
+      "id": "1c2d3ae1-1fcd-4620-8ed1-be54d4e20988"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2128127281,
+          "mode": "list",
+          "cachedResultName": "Leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=2128127281"
+        },
+        "options": {}
+      },
+      "name": "C: Get Leads",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        96,
+        1008
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "id": "a19c9e90-3f1c-4c2f-9f24-dbddb344f23a"
+    },
+    {
+      "parameters": {
+        "jsCode": "const pick = (...names) => { for (const n of names) { try { return $(n); } catch (e) {} } throw new Error('Node not found: ' + names.join(' / ')); };\nconst norm = v => String(v || '').toLowerCase().replace(/\\b(mr|mrs|ms|miss|dr|prof)\\.?\\s+/g, '').replace(/\\s+/g, ' ').trim();\nconst findLead = (q, leads) => { q = norm(q); if (!q) return null;\n  return leads.find(l => norm(l.id) === q) ||\n         leads.find(l => l.profile_url && (norm(l.profile_url) === q || q.includes(norm(l.profile_url)))) ||\n         leads.find(l => norm(l.name) === q) ||\n         leads.find(l => l.name && (q.includes(norm(l.name)) || norm(l.name).includes(q))) || null; };\n// One control form: lead status changes, stop/do-not-contact, delete data, pause/resume\n// (reads the fields by label keyword, so renamed labels still work)\nconst f0 = $input.first().json;\nconst get = re => { const e = Object.entries(f0).find(([k, v]) => re.test(k) && typeof v === 'string'); return e ? e[1] : ''; };\nconst action = String(get(/action/i) || Object.values(f0).find(v => typeof v === 'string' && /^(connection accepted|they replied|said no|delete their data|pause|resume)/i.test(v)) || '');\nconst leadText = get(/lead|name|profile/i);\nconst notes = String(get(/note/i) || '');\nconst leads = pick('C: Get Leads').all().map(i => i.json).filter(l => l.id);\nconst out = { update_lead: false, add_dnc: false, pause: '', alert: false, dnc_entry: '', dnc_reason: '' };\nif (/^pause/i.test(action)) Object.assign(out, { pause: 'TRUE', alert: true, log_action: 'paused_manual', log_details: notes || 'warning / restriction seen' });\nelse if (/^resume/i.test(action)) Object.assign(out, { pause: 'FALSE', log_action: 'resumed', log_details: notes || 'resumed' });\nelse {\n  const l = findLead(leadText, leads);\n  if (!l) throw new Error('Lead not found in the Leads tab: ' + leadText);\n  const row = { id: l.id, name: l.name, role: l.role, company: l.company, profile_url: l.profile_url, draft: l.draft,\n                status: l.status, next_action_at: l.next_action_at };\n  if (/^connection accepted/i.test(action)) row.status = 'connected';\n  if (/^they replied/i.test(action)) { row.status = 'replied'; row.next_action_at = ''; }\n  if (/^said no/i.test(action)) { row.status = 'do_not_contact'; row.next_action_at = '';\n    Object.assign(out, { add_dnc: true, dnc_entry: l.profile_url || l.name, dnc_reason: 'said no / asked to stop' }); }\n  if (/^delete their data/i.test(action)) {\n    Object.assign(out, { add_dnc: true, dnc_entry: l.profile_url || l.name, dnc_reason: 'asked to delete their data' });\n    Object.assign(row, { name: 'deleted', role: '', company: '', profile_url: '', draft: '', status: 'deleted', next_action_at: '' });\n  }\n  Object.assign(out, row, { update_lead: true, log_action: 'lead_' + row.status, log_details: row.id });\n}\nreturn [{ json: out }];"
+      },
+      "name": "C: Plan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        1008
+      ],
+      "id": "9d462512-1a1b-48a8-9d26-5d4d83826e58"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "3def6e81-0a64-46f3-8e22-51d4846924f3",
+              "leftValue": "={{ $json.update_lead }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "C: Update lead?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        544,
+        864
+      ],
+      "id": "8b21342b-ade7-498c-8789-456d9ebcbc92"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2128127281,
+          "mode": "list",
+          "cachedResultName": "Leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=2128127281"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "name": "={{ $json.name }}",
+            "role": "={{ $json.role }}",
+            "company": "={{ $json.company }}",
+            "profile_url": "={{ $json.profile_url }}",
+            "status": "={{ $json.status }}",
+            "draft": "={{ $json.draft }}",
+            "next_action_at": "={{ $json.next_action_at }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "role",
+              "displayName": "role",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "profile_url",
+              "displayName": "profile_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fit_score",
+              "displayName": "fit_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "draft",
+              "displayName": "draft",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "next_action_at",
+              "displayName": "next_action_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "C: Update Lead",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        752,
+        848
+      ],
+      "id": "f104f05c-cb07-46ff-aa5b-dfbe39109bb3"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "a70139fa-a453-428d-a488-710465df2d0c",
+              "leftValue": "={{ $json.add_dnc }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "C: Add to do-not-contact?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        544,
+        1024
+      ],
+      "id": "3a2336dd-729f-4019-933d-e8538000b388"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2116799616,
+          "mode": "list",
+          "cachedResultName": "DoNotContact",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=2116799616"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "entry": "={{ $json.dnc_entry }}",
+            "reason": "={{ $json.dnc_reason }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "entry",
+              "displayName": "entry",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "C: Add DoNotContact",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        832,
+        1008
+      ],
+      "id": "fd8e72ce-9f8c-4038-a234-719e0fa4f4b9"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "df94e9d2-b6d9-4bf9-88bb-9b6b3e4178dd",
+              "leftValue": "={{ $json.pause !== '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "C: Pause / resume?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        544,
+        1184
+      ],
+      "id": "8e58bf14-86b4-4cf7-9cce-847e2f2f547f"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Settings",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "key": "main",
+            "paused": "={{ $('C: Plan').first().json.pause }}"
+          },
+          "matchingColumns": [
+            "key"
+          ],
+          "schema": [
+            {
+              "id": "key",
+              "displayName": "key",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "paused",
+              "displayName": "paused",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "target_audience",
+              "displayName": "target_audience",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "outreach_per_day",
+              "displayName": "outreach_per_day",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "outreach_gap",
+              "displayName": "outreach_gap",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "work_hours",
+              "displayName": "work_hours",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "timezone",
+              "displayName": "timezone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "posts_per_day",
+              "displayName": "posts_per_day",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "post_gap_hours",
+              "displayName": "post_gap_hours",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "check_interval_min",
+              "displayName": "check_interval_min",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "reply_delay",
+              "displayName": "reply_delay",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "followup_days",
+              "displayName": "followup_days",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "daily_report",
+              "displayName": "daily_report",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "C: Set Pause",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        784,
+        1168
+      ],
+      "id": "04c36526-491d-4ec9-bfa7-78e99c956c4c"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "e4473d00-4b7f-4e74-a9bf-79434c62ee4e",
+              "leftValue": "={{ $('C: Plan').first().json.alert }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "C: Alert?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1024,
+        1168
+      ],
+      "id": "33ec0037-f5e3-4dd1-872f-3f4fcf40ae3c"
+    },
+    {
+      "parameters": {
+        "sendTo": "YOUR_APPROVAL_EMAIL@gmail.com",
+        "subject": "LinkedIn automation PAUSED",
+        "message": "={{ '<p>Everything is <b>paused</b> (warning / restriction reported).</p><p>' + $('C: Plan').first().json.log_details + '</p><p>Set paused = FALSE (or use Resume in the control form) when it is safe.</p>' }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "name": "C: Pause Alert",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1216,
+        1152
+      ],
+      "id": "c716300e-fb7c-4f5b-a984-87bfcf3a2a32",
+      "webhookId": "dc9558b8-ff35-4094-abf0-889d5063cb06"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 531499837,
+          "mode": "list",
+          "cachedResultName": "Logs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=531499837"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "time": "={{ $now.toISO() }}",
+            "workflow": "5 Messages & Control",
+            "action": "={{ $json.log_action }}",
+            "details": "={{ $json.log_details }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "time",
+              "displayName": "time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "details",
+              "displayName": "details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "C: Write Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        544,
+        1344
+      ],
+      "id": "660a2ef1-a8c9-40c5-87fa-aabbab8ffbc0"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "15 18 * * 1-5"
+            }
+          ]
+        }
+      },
+      "name": "Weekdays 6:15 pm",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -128,
+        1584
+      ],
+      "id": "ff71c5e5-8f62-46aa-a73c-f95ce3c3b213"
+    },
+    {
+      "parameters": {},
+      "name": "Manual run (test)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        1776
+      ],
+      "id": "0afeeadc-768d-4eb7-b6dc-76fca027bfa2"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Settings",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "options": {}
+      },
+      "name": "R: Get Settings",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        96,
+        1664
+      ],
+      "alwaysOutputData": true,
+      "id": "a477024e-562e-458d-a5ed-0aa370b4e185"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 531499837,
+          "mode": "list",
+          "cachedResultName": "Logs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=531499837"
+        },
+        "options": {}
+      },
+      "name": "R: Get Logs",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        320,
+        1664
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "id": "eb7bcb06-9db8-48b3-a098-eecd68096d1c"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2128127281,
+          "mode": "list",
+          "cachedResultName": "Leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=2128127281"
+        },
+        "options": {}
+      },
+      "name": "R: Get Leads",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        544,
+        1664
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "id": "4b493959-42a2-4f44-828b-dde9396f5196"
+    },
+    {
+      "parameters": {
+        "jsCode": "const pick = (...names) => { for (const n of names) { try { return $(n); } catch (e) {} } throw new Error('Node not found: ' + names.join(' / ')); };\n// Today's summary from Logs\nconst s = pick('R: Get Settings').first().json;\nif (String(s.daily_report).trim().toUpperCase() !== 'TRUE') return [];\nconst tz = s.timezone || 'Asia/Kolkata';\nconst today = DateTime.now().setZone(tz).toISODate();\nconst logs = pick('R: Get Logs').all().map(i => i.json).filter(l => l.time &&\n  DateTime.fromISO(String(l.time)).setZone(tz).toISODate() === today);\nconst leads = pick('R: Get Leads').all().map(i => i.json).filter(l => l.id);\nconst count = a => logs.filter(l => l.action === a).length;\nconst rows = [\n  ['New leads found', logs.filter(l => l.action === 'leads_found').reduce((n, l) => n + (parseInt(l.details) || 0), 0)],\n  ['Outreach sent (requests / messages / follow-ups)', count('outreach_sent')],\n  ['Outreach skipped', count('outreach_skipped')],\n  ['Message replies sent', count('message_reply_sent')],\n  ['Messages passed to a person', count('message_escalated')],\n  ['People added to do-not-contact', count('message_stop') + count('lead_do_not_contact')],\n  ['Posts approved / rejected', count('post_approved') + ' / ' + count('post_rejected')],\n  ['Posts published', count('post_published')],\n  ['Comments liked', count('comment_liked')],\n  ['Comment replies posted', count('comment_replied')],\n  ['Comments escalated / skipped', count('comment_escalated') + ' / ' + count('comment_skipped')],\n  ['Rate limits (429)', count('rate_limited')],\n  ['Pauses', count('paused_on_error') + count('paused_manual')],\n];\nconst pipeline = ['new', 'request_sent', 'connected', 'messaged', 'followed_up', 'replied', 'do_not_contact']\n  .map(st => st + ': ' + leads.filter(l => l.status === st).length).join(' · ');\nconst html = `<h3>LinkedIn automation — ${today}</h3>\n<p>Status: <b>${String(s.paused).toUpperCase() === 'TRUE' ? 'PAUSED' : 'running'}</b></p>\n<table cellpadding=\"6\" style=\"border-collapse:collapse\">${rows.map(r => `<tr><td style=\"border-bottom:1px solid #ddd\">${r[0]}</td><td style=\"border-bottom:1px solid #ddd\"><b>${r[1]}</b></td></tr>`).join('')}</table>\n<p><b>Lead pipeline:</b> ${pipeline}</p><p>Every action is in the Logs tab.</p>`;\nreturn [{ json: { html, subject: 'LinkedIn daily report — ' + today } }];\n"
+      },
+      "name": "R: Build Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        752,
+        1664
+      ],
+      "id": "46c0ca27-3480-43e5-9cdc-4578ad442226"
+    },
+    {
+      "parameters": {
+        "sendTo": "YOUR_APPROVAL_EMAIL@gmail.com",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "name": "R: Send Report",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        976,
+        1664
+      ],
+      "id": "0d274fe8-84a7-45d6-bdde-4e5e3c824290",
+      "webhookId": "fea2ac24-79d0-43e9-b0b7-871bfda66e4d"
+    },
+    {
+      "parameters": {
+        "content": "## 5 · Messages & Control\n**M. Message replies** (form): paste the whole chat → AI reads all of it → *stop* → do-not-contact, never contacted again · *needs a person* (price dispute, complaint, asks for a human) → email to you · *normal* → reply draft → you approve, send it yourself on LinkedIn, click *I sent it* (stops follow-ups).\n\n**C. Control form**: connection accepted / they replied / said no / delete their data / **PAUSE everything** (warning, restriction, verification request) / resume. One pause switch for all workflows.\n\n**R. Daily report** (weekdays 6:15 pm or manual): summary of today's Logs + lead pipeline by email.",
+        "height": 320,
+        "width": 720
+      },
+      "name": "Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        112,
+        -16
+      ],
+      "id": "fcaa4ef7-d294-40b6-ab26-e8b0e336fce6"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "M: Message Form": {
+      "main": [
+        [
+          {
+            "node": "M: Get Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "M: Get Settings": {
+      "main": [
+        [
+          {
+            "node": "M: Get Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "M: Get Leads": {
+      "main": [
+        [
+          {
+            "node": "M: Prepare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "M: Prepare": {
+      "main": [
+        [
+          {
+            "node": "M: Read Chat & Draft (AI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "M: Read Chat & Draft (AI)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "M: Read Chat & Draft (AI)": {
+      "main": [
+        [
+          {
+            "node": "M: Parse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "M: Parse": {
+      "main": [
+        [
+          {
+            "node": "M: Said stop?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "M: Needs a person?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "M: Normal reply?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "M: Said stop?": {
+      "main": [
+        [
+          {
+            "node": "M: Add to DoNotContact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "M: Add to DoNotContact": {
+      "main": [
+        [
+          {
+            "node": "M: Lead → do_not_contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "M: Lead → do_not_contact": {
+      "main": [
+        [
+          {
+            "node": "M: Log Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "M: Needs a person?": {
+      "main": [
+        [
+          {
+            "node": "M: Escalation Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "M: Escalation Email": {
+      "main": [
+        [
+          {
+            "node": "M: Log Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "M: Normal reply?": {
+      "main": [
+        [
+          {
+            "node": "M: Approval Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "M: Approval Email": {
+      "main": [
+        [
+          {
+            "node": "M: Wait for Person",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "M: Wait for Person": {
+      "main": [
+        [
+          {
+            "node": "M: Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "M: Result": {
+      "main": [
+        [
+          {
+            "node": "M: Lead → replied",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "M: Lead → replied": {
+      "main": [
+        [
+          {
+            "node": "M: Log Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "C: Control Form": {
+      "main": [
+        [
+          {
+            "node": "C: Get Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "C: Get Leads": {
+      "main": [
+        [
+          {
+            "node": "C: Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "C: Plan": {
+      "main": [
+        [
+          {
+            "node": "C: Update lead?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "C: Add to do-not-contact?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "C: Pause / resume?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "C: Write Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "C: Update lead?": {
+      "main": [
+        [
+          {
+            "node": "C: Update Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "C: Add to do-not-contact?": {
+      "main": [
+        [
+          {
+            "node": "C: Add DoNotContact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "C: Pause / resume?": {
+      "main": [
+        [
+          {
+            "node": "C: Set Pause",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "C: Set Pause": {
+      "main": [
+        [
+          {
+            "node": "C: Alert?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "C: Alert?": {
+      "main": [
+        [
+          {
+            "node": "C: Pause Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weekdays 6:15 pm": {
+      "main": [
+        [
+          {
+            "node": "R: Get Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual run (test)": {
+      "main": [
+        [
+          {
+            "node": "R: Get Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "R: Get Settings": {
+      "main": [
+        [
+          {
+            "node": "R: Get Logs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "R: Get Logs": {
+      "main": [
+        [
+          {
+            "node": "R: Get Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "R: Get Leads": {
+      "main": [
+        [
+          {
+            "node": "R: Build Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "R: Build Report": {
+      "main": [
+        [
+          {
+            "node": "R: Send Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": []
+}

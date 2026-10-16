@@ -1,0 +1,1897 @@
+{
+  "name": "3 Comments",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "name": "Every 30 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -208,
+        384
+      ],
+      "id": "7872c09e-18f1-4a57-a724-cd32eadc0bb3"
+    },
+    {
+      "parameters": {},
+      "name": "Manual run (test)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -208,
+        592
+      ],
+      "id": "05929da2-231a-401c-a352-7c41e89cb4ce"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Settings",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "options": {}
+      },
+      "name": "Get Settings",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        32,
+        480
+      ],
+      "alwaysOutputData": true,
+      "id": "0153f58b-3fcf-4933-8c09-563886cb6f6f"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 2141293537,
+          "mode": "list",
+          "cachedResultName": "Posts",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=2141293537"
+        },
+        "options": {}
+      },
+      "name": "Get Posts",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        240,
+        480
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "id": "66d25bee-9f59-4244-9fae-65200859cd84"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1445912891,
+          "mode": "list",
+          "cachedResultName": "Comments",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=1445912891"
+        },
+        "options": {}
+      },
+      "name": "Get Comments",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        464,
+        480
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "id": "ad916b80-90f2-438b-9d06-a9d28f0a096f"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 531499837,
+          "mode": "list",
+          "cachedResultName": "Logs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=531499837"
+        },
+        "options": {}
+      },
+      "name": "Get Logs",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        688,
+        480
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "id": "88ce1cba-18f8-42c6-a388-6c0db9c98b17"
+    },
+    {
+      "parameters": {
+        "jsCode": "const pick = (...names) => { for (const n of names) { try { return $(n); } catch (e) {} } throw new Error('Node not found: ' + names.join(' / ')); };\n// Gate: pause, 429 wait, check interval, working hours -> last 5 published posts to check\n// On a manual/test run it tells you WHY it stopped instead of stopping silently.\nconst s = pick('Get Settings').first().json;\nconst posts = pick('Get Posts').all().map(i => i.json);\nconst logs = pick('Get Logs').all().map(i => i.json);\nconst isTrue = v => String(v).trim().toUpperCase() === 'TRUE';\nlet manual = false;\ntry { manual = $execution.mode === 'test' || $execution.mode === 'manual'; } catch (e) {}\ntry { manual = manual || $('Manual run (test)').isExecuted === true; } catch (e) {}\nconst stop = why => { if (manual) throw new Error('Gate stopped: ' + why); return []; };\n\nif (isTrue(s.paused)) return stop('paused = TRUE in Settings');\nconst todayUTC = DateTime.utc().toISODate();\nif (logs.some(l => l.action === 'rate_limited' && String(l.time).slice(0, 10) === todayUTC)) return stop('a rate_limited (429) row exists in Logs for today (UTC)');\n\nconst tz = s.timezone || 'Asia/Kolkata';\nconst now = DateTime.now().setZone(tz);\nconst [ws, we] = String(s.work_hours || '9-18').split(/[^0-9]+/).filter(Boolean).map(Number);\nif (!manual) {\n  if (now.weekday > 5 || now.hour < ws || now.hour >= we) return [];\n  const interval = [30, 60, 120, 240].includes(Number(s.check_interval_min)) ? Number(s.check_interval_min) : 60;\n  const lastCheck = logs.filter(l => l.action === 'comments_checked').map(l => DateTime.fromISO(String(l.time))).sort((a, b) => b - a)[0];\n  if (lastCheck && DateTime.now().diff(lastCheck, 'minutes').minutes < interval - 2) return [];   // check interval\n}\n// post URN: from post_urn, or any column (post_url, renamed header...) that contains a LinkedIn URN\nconst urnOf = p => { const v = Object.entries(p).find(([k, v]) => /post_?ur[nl]/i.test(k.trim()) && String(v).includes('urn:li:'))?.[1]\n  || Object.values(p).find(v => /urn:li:(share|ugcPost|activity):/.test(String(v)));\n  return String(v || '').trim().replace(/^.*\\/update\\//, '').replace(/\\/$/, ''); };\nconst out = posts.filter(p => String(p.status).trim().toLowerCase() === 'published' && urnOf(p))\n  .sort((a, b) => String(b.published_at).localeCompare(String(a.published_at)))\n  .slice(0, 5).map(p => ({ json: { post_urn: urnOf(p) } }));\nif (!out.length) return stop('no row in Posts with status \"published\" and a post_urn (columns seen: ' + Object.keys(posts[0] || {}).join(', ') + ')');\nreturn out;"
+      },
+      "name": "Gate & Select Posts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        480
+      ],
+      "id": "958d2781-ccab-4dde-89ed-8b02b0e3f0ff"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 531499837,
+          "mode": "list",
+          "cachedResultName": "Logs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=531499837"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "time": "={{ $now.toISO() }}",
+            "workflow": "3 Comments",
+            "action": "comments_checked",
+            "details": "={{ 'checked ' + $('Gate & Select Posts').all().length + ' posts' }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "time",
+              "displayName": "time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "details",
+              "displayName": "details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "Log Check",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1152,
+        224
+      ],
+      "executeOnce": true,
+      "id": "010ab6a2-c28b-45a4-b9bd-96e9d67525b5"
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://api.linkedin.com/v2/socialActions/' + encodeURIComponent($json.post_urn) + '/comments?count=50' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_LINKEDIN_TOKEN"
+            },
+            {
+              "name": "X-Restli-Protocol-Version",
+              "value": "2.0.0"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Fetch Comments",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        480
+      ],
+      "id": "933023c5-2757-48e3-b93a-f9eb219a3f63",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const pick = (...names) => { for (const n of names) { try { return $(n); } catch (e) {} } throw new Error('Node not found: ' + names.join(' / ')); };\n// One item per top-level comment\nconst gates = pick('Gate & Select Posts').all();\nconst out = [];\n$input.all().forEach((it, i) => {\n  const post_urn = gates[i]?.json.post_urn;\n  for (const c of (it.json.elements || [])) {\n    const urn = c.commentUrn || c['$URN'] || '';\n    if (!urn) continue;\n    out.push({ json: { post_urn, comment_urn: urn, author: c.actor || '', text: c.message?.text || '',\n                       created: c.created?.time || 0 } });\n  }\n});\nreturn out;\n"
+      },
+      "name": "Flatten Comments",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        480
+      ],
+      "id": "a484923f-7b67-4f68-bcdf-e45903677719"
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://api.linkedin.com/v2/socialActions/' + encodeURIComponent($json.comment_urn).replace(/\\(/g, '%28').replace(/\\)/g, '%29') + '/comments?count=50' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_LINKEDIN_TOKEN"
+            },
+            {
+              "name": "X-Restli-Protocol-Version",
+              "value": "2.0.0"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Fetch Replies",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1568,
+        480
+      ],
+      "id": "de46ef11-d0bb-48a5-b5f3-77281211fd67",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const pick = (...names) => { for (const n of names) { try { return $(n); } catch (e) {} } throw new Error('Node not found: ' + names.join(' / ')); };\n// Builds each thread (top comment + replies) and keeps only NEW comments from other people\nconst ORG = 'urn:li:organization:YOUR_ORG_ID';\nconst tops = pick('Flatten Comments').all().map(i => i.json);\nconst known = new Set(pick('Get Comments').all().map(i => String(i.json.id || '')));\nconst out = [];\n$input.all().forEach((it, i) => {\n  const top = tops[i];\n  if (!top) return;\n  const replies = (it.json.elements || []).map(c => ({\n    comment_urn: c.commentUrn || c['$URN'] || '', author: c.actor || '', text: c.message?.text || '', created: c.created?.time || 0,\n  })).filter(r => r.comment_urn).sort((a, b) => a.created - b.created);\n  const thread = [top, ...replies];\n  const threadText = thread.map(c => (c.author === ORG ? 'US (company page)' : 'Commenter') + ': ' + c.text).join('\\n');\n  for (const c of thread) {\n    if (c.author === ORG || known.has(c.comment_urn)) continue;   // skip our own replies and already-handled comments\n    out.push({ json: { id: c.comment_urn, post_urn: top.post_urn, parent_urn: top.comment_urn,\n                       author: c.author, text: c.text, thread: threadText } });\n  }\n});\nreturn out;\n"
+      },
+      "name": "Collect New Comments",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        480
+      ],
+      "id": "9be4c586-c8b8-43d2-89a6-5a1100e302d6"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ 'You manage comments on the LinkedIn company page of YOUR_COMPANY_NAME, which sells a learning management system (LMS) to schools, colleges, training companies and HR/L&D teams.\\n\\n' +\n'Full thread (oldest first):\\n' + $json.thread + '\\n\\n' +\n'New comment to handle:\\n' + $json.text + '\\n\\n' +\n'1) Classify it as exactly one of:\\n' +\n'- spam (ads, links, irrelevant promotion)\\n' +\n'- abusive (insults, harassment, hate)\\n' +\n'- needs_human (pricing, discounts, contracts, complaints, refunds, technical problems, requests to talk to a person, or anything you cannot answer well and honestly)\\n' +\n'- normal (everything else)\\n' +\n'2) If normal, write a reply for this thread: 1-3 short sentences, warm and specific to what they said and to the thread, honest, no invented facts or numbers, no prices, no links, no pressure, max 1 emoji. If not normal, reply is an empty string.\\n\\n' +\n'Answer ONLY with JSON: {\"category\":\"\",\"reply\":\"\"}' }}",
+        "options": {
+          "systemMessage": "You are a careful, honest community manager. Always answer with valid JSON only, no markdown."
+        }
+      },
+      "name": "Classify & Draft (AI Agent)",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        2000,
+        480
+      ],
+      "id": "4b8f132e-f56b-497b-9945-4f141e5e1d28"
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0.4
+        }
+      },
+      "name": "Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        704
+      ],
+      "id": "5bb3d017-b1ad-4a7d-b630-b95822ce7b01"
+    },
+    {
+      "parameters": {
+        "jsCode": "const pick = (...names) => { for (const n of names) { try { return $(n); } catch (e) {} } throw new Error('Node not found: ' + names.join(' / ')); };\n// AI output -> Comments row\nconst src = pick('Collect New Comments').all();\nreturn $input.all().map((it, i) => {\n  const raw = String(it.json.output ?? it.json.text ?? '');\n  let d = {};\n  try { d = JSON.parse(raw.replace(/^\\s*```(json)?/i, '').replace(/```\\s*$/, '').trim()); } catch (e) { d = { category: 'needs_human', reply: '' }; }\n  const cat = ['spam', 'abusive', 'needs_human', 'normal'].includes(d.category) ? d.category : 'needs_human';\n  const c = src[i].json;\n  const status = cat === 'normal' ? 'pending' : (cat === 'needs_human' ? 'escalated' : 'skipped');\n  return { json: { id: c.id, post_urn: c.post_urn, parent_urn: c.parent_urn, author: c.author, text: c.text,\n                   category: cat, status, reply_text: cat === 'normal' ? String(d.reply || '') : '',\n                   created_at: DateTime.now().toISO() } };\n});\n"
+      },
+      "name": "Parse Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2224,
+        480
+      ],
+      "id": "1d5e69f2-e332-4c25-b270-ba27d76e4395"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1445912891,
+          "mode": "list",
+          "cachedResultName": "Comments",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=1445912891"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "post_urn": "={{ $json.post_urn }}",
+            "parent_urn": "={{ $json.parent_urn }}",
+            "author": "={{ $json.author }}",
+            "text": "={{ $json.text }}",
+            "category": "={{ $json.category }}",
+            "status": "={{ $json.status }}",
+            "reply_text": "={{ $json.reply_text }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "post_urn",
+              "displayName": "post_urn",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "parent_urn",
+              "displayName": "parent_urn",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "author",
+              "displayName": "author",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "text",
+              "displayName": "text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "reply_text",
+              "displayName": "reply_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "Save Comments",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2448,
+        480
+      ],
+      "id": "87d53f19-cb90-4170-b00f-770e4818c481"
+    },
+    {
+      "parameters": {
+        "jsCode": "const pick = (...names) => { for (const n of names) { try { return $(n); } catch (e) {} } throw new Error('Node not found: ' + names.join(' / ')); };\nreturn pick('Parse Result').all();"
+      },
+      "name": "Back to Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2672,
+        480
+      ],
+      "id": "0137e048-9c28-4f23-bc15-f4450d23cab1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "b0b4ce17-8732-4e40-aa8e-c63198c79d64",
+              "leftValue": "={{ $json.status !== 'skipped' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Not spam/abusive?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2880,
+        224
+      ],
+      "id": "1948652d-31b4-4cc5-947b-4198701e2cb1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://api.linkedin.com/v2/reactions?actor=' + encodeURIComponent('urn:li:organization:YOUR_ORG_ID') }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_LINKEDIN_TOKEN"
+            },
+            {
+              "name": "X-Restli-Protocol-Version",
+              "value": "2.0.0"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ root: $json.id, reactionType: 'LIKE' }) }}",
+        "options": {}
+      },
+      "name": "Like Comment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3104,
+        208
+      ],
+      "id": "781de9e8-3bc4-43dc-b778-e8c6d8aa2766",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 531499837,
+          "mode": "list",
+          "cachedResultName": "Logs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=531499837"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "time": "={{ $now.toISO() }}",
+            "workflow": "3 Comments",
+            "action": "comment_liked",
+            "details": "={{ $('Not spam/abusive?').item.json.id + ($json.error ? ' | like failed' : '') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "time",
+              "displayName": "time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "details",
+              "displayName": "details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "Log Like",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        3328,
+        208
+      ],
+      "id": "27d6b08f-23db-4723-8f77-178153a49cf5"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "0f712645-0a03-4f9f-aeca-431ac5e023c8",
+              "leftValue": "={{ $json.status === 'escalated' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Escalate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2880,
+        448
+      ],
+      "id": "fa28fed3-9828-4b34-af80-0a6faf7c5f44"
+    },
+    {
+      "parameters": {
+        "sendTo": "YOUR_APPROVAL_EMAIL@gmail.com",
+        "subject": "LinkedIn comment needs a person",
+        "message": "={{ '<p>This comment was passed to a person (pricing, complaint, request for a human, or a question the AI cannot answer well).</p><p><b>Comment:</b> ' + $json.text + '</p><p>Reply to it yourself on the company page.</p>' }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "name": "Escalation Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        3104,
+        368
+      ],
+      "id": "206518e0-2ead-498a-90fd-647c30fc56a4",
+      "webhookId": "21ea6438-96b6-4e9e-9e7f-559b7d472db0"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 531499837,
+          "mode": "list",
+          "cachedResultName": "Logs",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=531499837"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "time": "={{ $now.toISO() }}",
+            "workflow": "3 Comments",
+            "action": "={{ 'comment_' + $('Escalate?').item.json.status }}",
+            "details": "={{ $('Escalate?').item.json.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "time",
+              "displayName": "time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "details",
+              "displayName": "details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "Log Escalation",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        3408,
+        464
+      ],
+      "id": "2d1c381f-8b1e-4f70-88ab-de0edcff91ca"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "9f9e0344-a0bb-4846-9cbf-28fb7c5222b0",
+              "leftValue": "={{ $json.status === 'pending' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Pending reply?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2880,
+        688
+      ],
+      "id": "6bfd8f1b-442f-4ba6-bbd3-192b01fbbfc8"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "name": "Loop Over Comments",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        3104,
+        688
+      ],
+      "id": "f53a4d2e-e63d-44af-8d8d-4e7fe0137876"
+    },
+    {
+      "parameters": {
+        "sendTo": "YOUR_APPROVAL_EMAIL@gmail.com",
+        "subject": "Approve LinkedIn comment reply",
+        "message": "={{ '<p><b>Reply to a LinkedIn comment?</b></p><p><b>Comment:</b> ' + $json.text + '</p><p><b>Proposed reply:</b><br>' + $json.reply_text + '</p><p><a href=\"' + $execution.resumeUrl + ($execution.resumeUrl.includes(\"?\") ? \"&\" : \"?\") + 'decision=approve\" style=\"display:inline-block;padding:10px 22px;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;background:#16a34a\">Approve</a> &nbsp; <a href=\"' + $execution.resumeUrl + ($execution.resumeUrl.includes(\"?\") ? \"&\" : \"?\") + 'decision=reject\" style=\"display:inline-block;padding:10px 22px;color:#fff;text-decoration:none;border-radius:6px;font-weight:bold;background:#dc2626\">Reject</a></p><p>Approved replies are posted after a random 5-30 min delay.</p>' }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "name": "Send for Approval",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        3328,
+        800
+      ],
+      "id": "547cf81a-e82e-4e34-9ebb-7cbee04ae53a",
+      "webhookId": "38ce4d16-1bc5-40fe-b131-31ad0c6a7589"
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {}
+      },
+      "name": "Wait for Decision",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3552,
+        800
+      ],
+      "id": "be69a671-7042-4711-bc5d-d5781d294c96",
+      "webhookId": "c255c907-98b9-4566-9ef2-cfd78d96991e"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const pick = (...names) => { for (const n of names) { try { return $(n); } catch (e) {} } throw new Error('Node not found: ' + names.join(' / ')); };\n// Approve / Reject link clicked -> decision + random 5-30 min reply delay (1 min on manual test runs)\nconst c = pick('Loop Over Comments').item.json;\nconst s = pick('Get Settings').first().json;\nconst approved = String($json.query?.decision || '').toLowerCase() === 'approve';\nconst [mn, mx] = String(s.reply_delay || '5-30').split(/[^0-9]+/).filter(Boolean).map(Number);\nlet manual = false;\ntry { manual = $('Manual run (test)').isExecuted; } catch (e) {}\nconst delay = manual ? 1 : Math.floor(mn + Math.random() * (mx - mn + 1));\nreturn { json: { ...c, approved, status: approved ? 'approved' : 'rejected', delay_min: delay } };\n"
+      },
+      "name": "Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3760,
+        800
+      ],
+      "id": "562d8eea-c837-48bd-8fd3-7b027b80fe3f"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "d8bd9369-9100-45ff-aea4-bbe4e5a2a727",
+              "leftValue": "={{ $json.approved }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3984,
+        800
+      ],
+      "id": "f9b5bb4f-7d67-46c3-a18f-8ea4202b3066"
+    },
+    {
+      "parameters": {
+        "amount": "={{ $json.delay_min }}",
+        "unit": "minutes"
+      },
+      "name": "Random Reply Delay",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        4208,
+        720
+      ],
+      "id": "2fe64390-bf68-4767-bde1-1b4b6013d5dc",
+      "webhookId": "70f26ba5-1a83-463e-807e-ffa746416686"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://api.linkedin.com/v2/socialActions/' + encodeURIComponent($json.parent_urn).replace(/\\(/g, '%28').replace(/\\)/g, '%29') + '/comments' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_LINKEDIN_TOKEN"
+            },
+            {
+              "name": "X-Restli-Protocol-Version",
+              "value": "2.0.0"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ actor: 'urn:li:organization:YOUR_ORG_ID', object: (String($json.parent_urn).match(/^urn:li:comment:\\((urn:li:[a-zA-Z]+:\\d+),/) || [])[1] || $json.post_urn, parentComment: $json.parent_urn, message: { text: $json.reply_text } }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "name": "Post Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4432,
+        720
+      ],
+      "id": "c3eeae32-2937-410e-9c44-d78281329ef8"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const pick = (...names) => { for (const n of names) { try { return $(n); } catch (e) {} } throw new Error('Node not found: ' + names.join(' / ')); };\n// 201 -> replied, 429 -> stop calls today, other error -> pause everything\nconst c = pick('Decision').item.json;\nconst code = Number($json.statusCode);\nif (code === 201 || code === 200) return { json: { id: c.id, status: 'replied', log_action: 'comment_replied', log_details: c.id + ' | ' + c.reply_text.slice(0, 120), pause: false } };\nif (code === 429) return { json: { id: c.id, status: 'reply_failed', log_action: 'rate_limited', log_details: c.id + ' | 429 on reply', pause: false } };\nreturn { json: { id: c.id, status: 'reply_failed', log_action: 'paused_on_error',\n                 log_details: c.id + ' | HTTP ' + code + ' | ' + JSON.stringify($json.body ?? $json).slice(0, 300), pause: true } };\n"
+      },
+      "name": "Reply Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4640,
+        720
+      ],
+      "id": "32958e94-36c2-4d8d-bb9c-f47e7def0b9b"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const pick = (...names) => { for (const n of names) { try { return $(n); } catch (e) {} } throw new Error('Node not found: ' + names.join(' / ')); };\nconst c = $json; return { json: { id: c.id, status: 'rejected', log_action: 'comment_reply_rejected', log_details: c.id, pause: false } };"
+      },
+      "name": "Rejected Row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4208,
+        928
+      ],
+      "id": "1eaea9c6-0561-46d2-af7d-79959e94a045"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1445912891,
+          "mode": "list",
+          "cachedResultName": "Comments",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=1445912891"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "status": "={{ $json.status }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "post_urn",
+              "displayName": "post_urn",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "parent_urn",
+              "displayName": "parent_urn",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "author",
+              "displayName": "author",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "text",
+              "displayName": "text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "reply_text",
+              "displayName": "reply_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "Update Comment",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        4864,
+        800
+      ],
+      "id": "9bf458ec-67ef-49d0-ba2d-c3e0e6307e83"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Logs",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "time": "={{ $now.toISO() }}",
+            "workflow": "3 Comments",
+            "action": "={{ 'comment_' + $json.status }}",
+            "details": "={{ $json.id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "time",
+              "displayName": "time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "workflow",
+              "displayName": "workflow",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "details",
+              "displayName": "details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "Write Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        5088,
+        800
+      ],
+      "id": "0f69f406-3dee-4f52-a6d1-8a0b6a35f2d6"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "5670dc24-8f16-43b9-a1ce-ae530b8914b9",
+              "leftValue": "={{ $json.pause === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Pause needed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        4864,
+        608
+      ],
+      "id": "036184a4-a999-4da1-b3fe-5a4d9d79ac75"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "LinkedIn Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Settings",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "key": "main",
+            "paused": "TRUE"
+          },
+          "matchingColumns": [
+            "key"
+          ],
+          "schema": [
+            {
+              "id": "key",
+              "displayName": "key",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "paused",
+              "displayName": "paused",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "target_audience",
+              "displayName": "target_audience",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "outreach_per_day",
+              "displayName": "outreach_per_day",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "outreach_gap",
+              "displayName": "outreach_gap",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "work_hours",
+              "displayName": "work_hours",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "timezone",
+              "displayName": "timezone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "posts_per_day",
+              "displayName": "posts_per_day",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "post_gap_hours",
+              "displayName": "post_gap_hours",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "check_interval_min",
+              "displayName": "check_interval_min",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "reply_delay",
+              "displayName": "reply_delay",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "followup_days",
+              "displayName": "followup_days",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "daily_report",
+              "displayName": "daily_report",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "name": "Pause Everything",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        5088,
+        592
+      ],
+      "id": "468ae4db-7fb9-4c1e-bf4e-315e9b661b11"
+    },
+    {
+      "parameters": {
+        "sendTo": "YOUR_APPROVAL_EMAIL@gmail.com",
+        "subject": "LinkedIn automation PAUSED",
+        "message": "={{ '<p>The automation was <b>paused</b>: LinkedIn returned an error while replying to a comment.</p><p>' + $('Pause needed?').item.json.log_details + '</p><p>Fix the cause, then set <b>paused = FALSE</b> in Settings.</p>' }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "name": "Alert Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        5312,
+        592
+      ],
+      "id": "ca8a9b29-a209-4b06-ad9a-3c00c0fb5925",
+      "webhookId": "8e986f81-db9e-4a2a-8b7b-b953e87ddb92"
+    },
+    {
+      "parameters": {
+        "content": "## 3 · Comments\nEvery 30 min, runs only every **check_interval_min** (manual run skips hours/interval): pause → 429 wait → last 5 published posts → comments + replies (whole thread) → only NEW comments from others → AI classifies **spam / abusive / needs_human / normal** + drafts a reply using the thread → Comments sheet →\n- not spam/abusive: **liked**\n- needs_human: **escalation email**\n- normal: approval email (Approve/Reject) → random **5–30 min** wait → reply posted in the same thread\n429 → stop for the day; other errors → **paused** + alert. Everything logged.",
+        "height": 280,
+        "width": 640
+      },
+      "name": "Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "1efdf3ed-27ee-4828-aa33-048a565e84bb"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 30 minutes": {
+      "main": [
+        [
+          {
+            "node": "Get Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual run (test)": {
+      "main": [
+        [
+          {
+            "node": "Get Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Settings": {
+      "main": [
+        [
+          {
+            "node": "Get Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Posts": {
+      "main": [
+        [
+          {
+            "node": "Get Comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Comments": {
+      "main": [
+        [
+          {
+            "node": "Get Logs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Logs": {
+      "main": [
+        [
+          {
+            "node": "Gate & Select Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate & Select Posts": {
+      "main": [
+        [
+          {
+            "node": "Log Check",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Comments": {
+      "main": [
+        [
+          {
+            "node": "Flatten Comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flatten Comments": {
+      "main": [
+        [
+          {
+            "node": "Fetch Replies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Replies": {
+      "main": [
+        [
+          {
+            "node": "Collect New Comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect New Comments": {
+      "main": [
+        [
+          {
+            "node": "Classify & Draft (AI Agent)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Classify & Draft (AI Agent)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify & Draft (AI Agent)": {
+      "main": [
+        [
+          {
+            "node": "Parse Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Result": {
+      "main": [
+        [
+          {
+            "node": "Save Comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Comments": {
+      "main": [
+        [
+          {
+            "node": "Back to Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Back to Rows": {
+      "main": [
+        [
+          {
+            "node": "Not spam/abusive?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Escalate?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Pending reply?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Not spam/abusive?": {
+      "main": [
+        [
+          {
+            "node": "Like Comment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Like Comment": {
+      "main": [
+        [
+          {
+            "node": "Log Like",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escalate?": {
+      "main": [
+        [
+          {
+            "node": "Escalation Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escalation Email": {
+      "main": [
+        [
+          {
+            "node": "Log Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pending reply?": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Comments": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Send for Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send for Approval": {
+      "main": [
+        [
+          {
+            "node": "Wait for Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Decision": {
+      "main": [
+        [
+          {
+            "node": "Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decision": {
+      "main": [
+        [
+          {
+            "node": "Approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approved?": {
+      "main": [
+        [
+          {
+            "node": "Random Reply Delay",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rejected Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Random Reply Delay": {
+      "main": [
+        [
+          {
+            "node": "Post Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Reply": {
+      "main": [
+        [
+          {
+            "node": "Reply Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply Result": {
+      "main": [
+        [
+          {
+            "node": "Update Comment",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Pause needed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rejected Row": {
+      "main": [
+        [
+          {
+            "node": "Update Comment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Comment": {
+      "main": [
+        [
+          {
+            "node": "Write Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Log": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Comments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pause needed?": {
+      "main": [
+        [
+          {
+            "node": "Pause Everything",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pause Everything": {
+      "main": [
+        [
+          {
+            "node": "Alert Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": []
+}
