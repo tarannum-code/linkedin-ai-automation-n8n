@@ -15,6 +15,8 @@ An n8n automation that, after we set only the **target audience and a few number
 | ![Approval email](screenshots/03-approval-email-post-and-image-approve-reject.png) | ![Live post](screenshots/01-live-post-published-on-company-page.png) |
 | **Real comment from an EdTech CEO → liked by the page → AI reply posted in the same thread** | **n8n: the approved reply posted through the official LinkedIn API** |
 | ![CEO comment and reply](screenshots/02-real-ceo-comment-liked-and-ai-reply-posted.png) | ![Post Reply node](screenshots/04-n8n-comment-reply-posted-via-linkedin-api.png) |
+| **Outreach queue: picks the next best-fit lead (fit score) after checking Logs for limits and gaps** | **Do-not-contact list: checked before every outreach action** |
+| ![Outreach queue](screenshots/06-n8n-outreach-picks-next-lead-fit-score-and-logs.png) | ![Do-not-contact list](screenshots/05-google-sheet-do-not-contact-list.png) |
 
 ---
 
