@@ -19,6 +19,8 @@ An n8n automation that, after we set only the **target audience and a few number
 | ![CEO comment and reply](screenshots/02-real-ceo-comment-liked-and-ai-reply-posted.png) | ![Post Reply node](screenshots/04-n8n-comment-reply-posted-via-linkedin-api.png) |
 | **Outreach queue: picks the next best-fit lead (fit score) after checking Logs for limits and gaps** | **Do-not-contact list: checked before every outreach action** |
 | ![Outreach queue](screenshots/06-n8n-outreach-picks-next-lead-fit-score-and-logs.png) | ![Do-not-contact list](screenshots/05-google-sheet-do-not-contact-list.png) |
+| **LinkedIn Developer app: official API products added (Share on LinkedIn, Advertising API, Events, OpenID Connect)** | **OAuth 2.0 scopes granted: `w_organization_social`, `r_organization_social`, `rw_organization_admin`, …** |
+| ![LinkedIn app products](screenshots/07-linkedin-developer-app-approved-products.png) | ![LinkedIn OAuth scopes](screenshots/08-linkedin-developer-app-oauth-scopes.png) |
 
 ---
 
